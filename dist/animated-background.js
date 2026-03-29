@@ -1345,11 +1345,18 @@ class AnimatedBackgroundEditor extends HTMLElement {
     dlBtn.disabled = true;
     progDiv.style.display = '';
 
+    const urls = _getAllClassicUrls();
+    const total = urls.length;
+
+    // Check if HA downloader service is available for server-side download
+    const hasDownloader = this._hass?.services?.downloader?.download_file;
+
     try {
-      const urls = _getAllClassicUrls();
       const db = await _openABDB();
       let done = 0;
-      const total = urls.length;
+      let failed = 0;
+      let attempted = 0;
+      let corsBlocked = false;
 
       for (const url of urls) {
         const exists = await new Promise((resolve) => {
@@ -1360,30 +1367,83 @@ class AnimatedBackgroundEditor extends HTMLElement {
         });
         if (exists) { done++; continue; }
 
+        attempted++;
         progTxt.textContent = 'Downloading ' + (done + 1) + ' of ' + total + '\u2026';
         progFill.style.width = Math.round((done / total) * 100) + '%';
         try {
-          const resp = await fetch(url, { mode: 'cors' });
-          if (resp.ok) {
-            const blob = await resp.blob();
-            await new Promise((resolve, reject) => {
-              const tx = db.transaction(AB_DB_STORE, 'readwrite');
-              tx.objectStore(AB_DB_STORE).put(blob, url);
-              tx.oncomplete = resolve;
-              tx.onerror = () => reject(tx.error);
-            });
-          }
+          const resp = await fetch(url);
+          if (!resp.ok) throw new Error('HTTP ' + resp.status);
+          const blob = await resp.blob();
+          await new Promise((resolve, reject) => {
+            const tx = db.transaction(AB_DB_STORE, 'readwrite');
+            tx.objectStore(AB_DB_STORE).put(blob, url);
+            tx.oncomplete = resolve;
+            tx.onerror = () => reject(tx.error);
+          });
         } catch (err) {
           console.warn('Animated Background: failed to cache', url, err);
+          failed++;
+          // If the first attempt fails with a network error, it's likely CORS — stop
+          if (attempted === 1 && err instanceof TypeError) {
+            corsBlocked = true;
+            break;
+          }
         }
         done++;
         progFill.style.width = Math.round((done / total) * 100) + '%';
       }
 
       db.close();
-      progTxt.textContent = 'Done! All ' + total + ' videos cached.';
-      progFill.style.width = '100%';
-      setTimeout(() => { progDiv.style.display = 'none'; }, 3000);
+
+      if (corsBlocked && hasDownloader) {
+        // Use HA downloader service for server-side download
+        progTxt.textContent = 'Using HA Downloader service\u2026';
+        progFill.style.background = '';
+        let dlDone = 0;
+        let dlFailed = 0;
+        for (const url of urls) {
+          const filename = url.split('/').pop();
+          try {
+            await this._hass.callService('downloader', 'download_file', {
+              url: url,
+              subdir: 'animated-background',
+              filename: filename,
+              overwrite: false,
+            });
+          } catch (e) {
+            console.warn('Animated Background: downloader failed for', url, e);
+            dlFailed++;
+          }
+          dlDone++;
+          progFill.style.width = Math.round((dlDone / total) * 100) + '%';
+          progTxt.textContent = 'Server download ' + dlDone + ' of ' + total + '\u2026';
+        }
+        if (dlFailed === 0) {
+          progTxt.innerHTML = '\u2714\uFE0F Videos downloaded to HA server!<br>'
+            + '<small>Files saved to your HA Downloader directory under <code>animated-background/</code>.<br>'
+            + 'Move them to <code>/config/www/ab-videos/</code> and use <code>/local/ab-videos/</code> paths in <b>state_url</b>.</small>';
+        } else {
+          progTxt.innerHTML = 'Server download: ' + (total - dlFailed) + '/' + total + ' succeeded.<br>'
+            + '<small>Check your HA Downloader directory for the downloaded files.</small>';
+        }
+        progFill.style.width = '100%';
+      } else if (corsBlocked) {
+        progTxt.innerHTML = '\u26A0\uFE0F Download blocked by CDN (CORS policy).<br>'
+          + '<small>The Flixel video CDN does not allow browser-based downloads.<br>'
+          + 'Install the <b>Downloader</b> integration in HA to enable server-side downloads, '
+          + 'or manually download the videos to <code>/config/www/</code> via SSH '
+          + 'and use <code>/local/</code> paths in <b>state_url</b>.</small>';
+        progFill.style.width = '100%';
+        progFill.style.background = 'var(--error-color, #f44)';
+      } else if (failed > 0) {
+        progTxt.textContent = 'Cached ' + (attempted - failed) + ' of ' + attempted + ' new videos (' + failed + ' failed).';
+        progFill.style.width = '100%';
+        setTimeout(() => { progDiv.style.display = 'none'; }, 6000);
+      } else {
+        progTxt.textContent = 'Done! All ' + total + ' videos cached \u2714\uFE0F';
+        progFill.style.width = '100%';
+        setTimeout(() => { progDiv.style.display = 'none'; }, 4000);
+      }
     } catch (e) {
       progTxt.textContent = 'Error: ' + e.message;
     }
