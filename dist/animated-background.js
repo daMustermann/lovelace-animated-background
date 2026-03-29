@@ -928,7 +928,16 @@ class AnimatedBackground extends HTMLElement {
 
   _renderCard() {
     if (!this._config.show_card) {
-      this.shadowRoot.innerHTML = '<div style="display:none"></div>';
+      this.shadowRoot.innerHTML = `
+        <style>
+          :host{display:block;min-height:1px}
+          ha-card{min-height:32px;overflow:hidden;background:transparent!important;box-shadow:none!important;border:none!important;opacity:0;transition:opacity .2s}
+          :host(:hover) ha-card,:host(.edit-mode) ha-card{opacity:1;background:rgba(var(--rgb-card-background-color,255,255,255),.4)!important;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+          .h{display:flex;align-items:center;justify-content:center;padding:6px 12px;gap:6px;font-size:12px;opacity:.7}
+        </style>
+        <ha-card>
+          <div class="h">Animated Background — Card hidden (hover to configure)</div>
+        </ha-card>`;
       return;
     }
     this.shadowRoot.innerHTML = `
