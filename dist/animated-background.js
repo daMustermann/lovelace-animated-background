@@ -675,7 +675,9 @@ class AnimatedBackground extends HTMLElement {
     }
     // 2. Preset: classic (video-based)
     else if (preset?.videos && state) {
-      const vids = preset.videos[state];
+      // At night, always pick from the night videos
+      const effectiveState = (night && preset.videos['clear-night']) ? 'clear-night' : state;
+      const vids = preset.videos[effectiveState];
       if (vids) url = randomFrom(vids);
       else if (preset.defaultUrl) url = preset.defaultUrl;
     }
