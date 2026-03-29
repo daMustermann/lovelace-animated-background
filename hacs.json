@@ -1,4 +1,6 @@
 {
-    "name": "Lovelace Animated Background",
-    "render_readme": true
+  "name": "Animated Background",
+  "render_readme": true,
+  "filename": "animated-background.js",
+  "content_in_root": false
 }

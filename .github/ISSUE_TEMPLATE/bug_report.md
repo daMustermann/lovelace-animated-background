@@ -1,43 +1,37 @@
 ---
 name: Bug report
-about: Use common sense to determine what you need to provide
-title: Bug report
-labels: ''
+about: Report an issue with Animated Background
+title: "[Bug] "
+labels: bug
 assignees: ''
 
 ---
 
 **Describe the bug**
-A clear and concise description of what the bug is.
+A clear and concise description of the issue.
 
-**Your Animated Background configuration**
-
-```yaml
-animated_background:
-  your_config
-```
-
-**Your view configuration if it contains animated_background**
+**Your Animated Background card configuration**
 
 ```yaml
-animated_background: your_config
+type: custom:animated-background
+entity: ...
+preset: ...
 ```
 
 **Version Numbers**
-"Latest" is not a version number
-
-  - Home Assistant:
-  - Animated Background:
+- Home Assistant:
+- Animated Background:
+- Browser:
 
 **Browser console log**
-Post anything related to animated-background.js
+Open browser dev tools (F12), go to Console, and paste any errors related to `animated-background`. Enable `debug: true` in your card config for more details.
 
+**Steps to reproduce**
+1. ...
+2. ...
 
-**To Reproduce**
-Steps to reproduce the behavior:
-1. Go to '...'
-2. Click on '....'
-3. Scroll down to '....'
+**Screenshots**
+If applicable, add screenshots.
 4. See error
 
 **Expected behavior**
