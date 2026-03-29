@@ -7,7 +7,18 @@
 const CARD_VERSION = '2.2.0';
 const CARD_NAME = 'animated-background';
 const BG_CONTAINER_ID = 'ab-container';
-const AB_CACHE_NAME = 'animated-background-classic-videos';
+const AB_DB_NAME = 'animated-background-cache';
+const AB_DB_STORE = 'videos';
+const AB_DB_VERSION = 1;
+
+function _openABDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(AB_DB_NAME, AB_DB_VERSION);
+    req.onupgradeneeded = () => { req.result.createObjectStore(AB_DB_STORE); };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
 
 console.info(
   `%c ANIMATED BACKGROUND %c v${CARD_VERSION} %c by Maudersoft `,
@@ -237,11 +248,18 @@ function _getAllClassicUrls() {
 
 async function _getCachedUrl(url) {
   try {
-    const cache = await caches.open(AB_CACHE_NAME);
-    const resp = await cache.match(url);
-    if (resp) return URL.createObjectURL(await resp.blob());
-  } catch (_) {}
-  return null;
+    const db = await _openABDB();
+    return new Promise((resolve) => {
+      const tx = db.transaction(AB_DB_STORE, 'readonly');
+      const req = tx.objectStore(AB_DB_STORE).get(url);
+      req.onsuccess = () => {
+        db.close();
+        if (req.result) resolve(URL.createObjectURL(req.result));
+        else resolve(null);
+      };
+      req.onerror = () => { db.close(); resolve(null); };
+    });
+  } catch (_) { return null; }
 }
 
 // --- Preset registry ---
@@ -1074,7 +1092,7 @@ class AnimatedBackgroundEditor extends HTMLElement {
       </style>
       <div class="e">
         <div class="st">General</div>
-        <div class="r"><label>Entity</label><ha-entity-picker allow-custom-entity></ha-entity-picker><div class="h">Weather entity recommended. Leave empty for auto-detection.</div></div>
+        <div class="r"><label>Entity</label><div id="ep-wrap"></div><div class="h">Weather entity recommended. Leave empty for auto-detection.</div></div>
         <div class="r"><label>Preset</label><select id="ps">${opts}</select>
           <div class="presets-info">
             <b>Weather</b> \u2014 Relaxed sky gradients with gentle rain, snow, stars<br>
@@ -1094,7 +1112,7 @@ class AnimatedBackgroundEditor extends HTMLElement {
               <span id="cache-txt">Downloading\u2026</span>
               <div class="cache-bar"><div class="cache-bar-fill" id="cache-fill" style="width:0%"></div></div>
             </div>
-            <div class="h">Downloads all classic preset videos to your browser for offline use. Videos are stored in the browser cache \u2014 no internet required after download.</div>
+            <div class="h">Downloads all classic preset videos to your browser for offline use. Videos are stored locally \u2014 no internet required after download.</div>
           </div>
         </div>
         <div class="r"><label>Per-Device Presets</label>
@@ -1200,14 +1218,17 @@ class AnimatedBackgroundEditor extends HTMLElement {
 
   _bind() {
     const sr = this.shadowRoot;
-    const pk = sr.querySelector('ha-entity-picker');
-    if (pk) {
+    const epWrap = sr.getElementById('ep-wrap');
+    if (epWrap) {
+      const pk = document.createElement('ha-entity-picker');
+      pk.allowCustomEntity = true;
       pk.hass = this._hass;
       pk.value = this._config.entity || '';
       pk.addEventListener('value-changed', e => {
         e.stopPropagation();
         this._set('entity', e.detail.value || '');
       });
+      epWrap.appendChild(pk);
     }
     sr.getElementById('ps').addEventListener('change', e => { this._set('preset', e.target.value); this._updateCacheSection(); });
     sr.getElementById('du').addEventListener('change', e => this._set('default_url', e.target.value));
@@ -1275,27 +1296,32 @@ class AnimatedBackgroundEditor extends HTMLElement {
 
     try {
       const urls = _getAllClassicUrls();
-      const cache = await caches.open(AB_CACHE_NAME);
-      let cached = 0;
-      for (const url of urls) {
-        const resp = await cache.match(url);
-        if (resp) cached++;
-      }
+      const db = await _openABDB();
+      const keys = await new Promise((resolve, reject) => {
+        const tx = db.transaction(AB_DB_STORE, 'readonly');
+        const req = tx.objectStore(AB_DB_STORE).getAllKeys();
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+      db.close();
+      const cached = urls.filter(u => keys.includes(u)).length;
       const total = urls.length;
       if (cached === 0) {
         statusEl.innerHTML = '<span class="dot not-cached"></span> Not cached \u2014 videos stream from CDN';
         dlBtn.style.display = ''; rmBtn.style.display = 'none';
         dlBtn.textContent = '\u2B07\uFE0F Download All for Offline (' + total + ' videos)';
+        dlBtn.disabled = false;
       } else if (cached < total) {
         statusEl.innerHTML = '<span class="dot cached" style="background:#ff9800"></span> Partially cached (' + cached + '/' + total + ' videos)';
         dlBtn.style.display = ''; rmBtn.style.display = '';
         dlBtn.textContent = '\u2B07\uFE0F Download Remaining (' + (total - cached) + ' videos)';
+        dlBtn.disabled = false;
       } else {
         statusEl.innerHTML = '<span class="dot cached"></span> All ' + total + ' videos cached for offline use';
         dlBtn.style.display = 'none'; rmBtn.style.display = '';
       }
     } catch (e) {
-      statusEl.innerHTML = '<span class="dot not-cached"></span> Cache API not available';
+      statusEl.innerHTML = '<span class="dot not-cached"></span> Browser storage not available';
       dlBtn.disabled = true;
     }
   }
@@ -1312,18 +1338,32 @@ class AnimatedBackgroundEditor extends HTMLElement {
 
     try {
       const urls = _getAllClassicUrls();
-      const cache = await caches.open(AB_CACHE_NAME);
+      const db = await _openABDB();
       let done = 0;
       const total = urls.length;
 
       for (const url of urls) {
-        const existing = await cache.match(url);
-        if (existing) { done++; continue; }
+        const exists = await new Promise((resolve) => {
+          const tx = db.transaction(AB_DB_STORE, 'readonly');
+          const req = tx.objectStore(AB_DB_STORE).get(url);
+          req.onsuccess = () => resolve(!!req.result);
+          req.onerror = () => resolve(false);
+        });
+        if (exists) { done++; continue; }
+
         progTxt.textContent = 'Downloading ' + (done + 1) + ' of ' + total + '\u2026';
         progFill.style.width = Math.round((done / total) * 100) + '%';
         try {
           const resp = await fetch(url, { mode: 'cors' });
-          if (resp.ok) await cache.put(url, resp);
+          if (resp.ok) {
+            const blob = await resp.blob();
+            await new Promise((resolve, reject) => {
+              const tx = db.transaction(AB_DB_STORE, 'readwrite');
+              tx.objectStore(AB_DB_STORE).put(blob, url);
+              tx.oncomplete = resolve;
+              tx.onerror = () => reject(tx.error);
+            });
+          }
         } catch (err) {
           console.warn('Animated Background: failed to cache', url, err);
         }
@@ -1331,6 +1371,7 @@ class AnimatedBackgroundEditor extends HTMLElement {
         progFill.style.width = Math.round((done / total) * 100) + '%';
       }
 
+      db.close();
       progTxt.textContent = 'Done! All ' + total + ' videos cached.';
       progFill.style.width = '100%';
       setTimeout(() => { progDiv.style.display = 'none'; }, 3000);
@@ -1343,7 +1384,11 @@ class AnimatedBackgroundEditor extends HTMLElement {
 
   async _clearClassicCache() {
     try {
-      await caches.delete(AB_CACHE_NAME);
+      const db = await _openABDB();
+      const tx = db.transaction(AB_DB_STORE, 'readwrite');
+      tx.objectStore(AB_DB_STORE).clear();
+      await new Promise((resolve) => { tx.oncomplete = resolve; });
+      db.close();
     } catch (_) {}
     this._checkCacheStatus();
   }
