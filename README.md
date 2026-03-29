@@ -4,7 +4,7 @@
 
 Beautiful, dynamic animated backgrounds for your Home Assistant dashboards. Works out of the box with weather entities — or bring your own videos and images.
 
-**v2.0.0** — Complete rebuild for modern Home Assistant (2024–2026+).
+**v2.2.0** — Complete rebuild for modern Home Assistant (2024–2026+).
 
 ![animated-background-preview](https://raw.githubusercontent.com/Villhellm/README_images/master/Animation.gif)
 
@@ -23,6 +23,10 @@ Beautiful, dynamic animated backgrounds for your Home Assistant dashboards. Work
 - **Visual Editor** — Configure everything through the HA card editor UI
 - **Transparent Header** — Frosted-glass effect on the toolbar
 - **Adjustable Card Opacity** — Control how translucent your dashboard cards appear
+- **Per-Device Presets** — Different presets for mobile, tablet, and desktop
+- **Background Blur** — Configurable constant blur effect
+- **Idle Screensaver** — Auto blur & dim after inactivity, restores on touch/mouse
+- **Static Gradient Mode** — Keep gradient fixed while particles still animate
 - **Per-View Backgrounds** — Add the card to any view for view-specific backgrounds
 - **HACS Compatible** — Install as custom repository
 
@@ -82,14 +86,21 @@ preset: weather            # weather / night-sky / aurora / ocean / sunset / cla
 |--------|------|---------|-------------|
 | `entity` | string | *(auto-detected)* | Entity whose state drives the background. Weather entities recommended. |
 | `preset` | string | `none` | `weather`, `night-sky`, `aurora`, `ocean`, `sunset`, `classic`, or `none`. See presets below. |
+| `device_presets` | map | `{}` | Override preset per device type. Keys: `mobile`, `tablet`, `desktop`. |
 | `default_url` | string/list | `''` | Fallback background URL. Supports `.mp4`, `.webm`, images. Use a list for random selection. |
 | `state_url` | map | `{}` | Map of entity states to background URLs. Overrides preset gradients. |
 | `transition_duration` | number | `1.5` | Crossfade duration in seconds (0.3–5). |
 | `overlay` | string | `rgba(0,0,0,0.15)` | CSS color for readability overlay. Set to `none` to disable. |
 | `particles` | boolean | `true` | Enable weather-appropriate particle effects (rain, snow, stars, hail). |
+| `static_gradient` | boolean | `false` | Keep gradient background static (no animation) while particles still move. |
 | `card_opacity` | number | `0.88` | Opacity of dashboard cards (0.3–1.0). Lower = more background visible. |
 | `show_card` | boolean | `true` | Show the small status indicator card. Set `false` to hide. |
 | `transparent_header` | boolean | `true` | Make the toolbar translucent with frosted-glass effect. |
+| `blur` | number | `0` | Constant background blur in pixels (0–30). |
+| `idle_blur` | boolean | `false` | Enable idle screensaver (blur + dim after inactivity). |
+| `idle_timeout` | number | `60` | Seconds of inactivity before screensaver activates (5–300). |
+| `idle_blur_strength` | number | `8` | Blur strength in pixels when idle (1–30). |
+| `idle_dim` | number | `0.3` | Dim amount when idle (0–0.8). Higher = darker. |
 | `debug` | boolean | `false` | Enable verbose console logging. |
 
 ---
@@ -140,13 +151,25 @@ preset: sunset
 
 ### 🎬 `classic` — Original Cinemagraph Videos
 
-The original Flixel cinemagraph videos from v1 — beautiful looping scene videos for each weather state, streamed from CDN. No CSS gradients, just real video. **Requires internet access.**
+The original Flixel cinemagraph videos from v1 — beautiful looping scene videos for each weather state, streamed from CDN. No CSS gradients, just real video.
 
 ```yaml
 preset: classic
 ```
 
 Includes videos for: sunny, partly cloudy, cloudy, clear night, fog, rainy, pouring, lightning, snowy, snowy-rainy.
+
+#### 📥 Offline Download
+
+By default the classic preset streams videos from the internet. You can **download all videos for offline use** directly from the card editor:
+
+1. Select the **Classic** preset in the visual editor
+2. A new **"Download for Offline"** section appears below the preset selector
+3. Click **"Download All for Offline"** — the card will cache all videos in your browser
+4. A progress bar shows download status
+5. Once cached, videos load instantly from the browser cache — no internet required
+
+You can also clear the cache at any time with the **"Clear Cache"** button. The cache status indicator shows whether videos are fully cached, partially cached, or not cached.
 
 ### Weather State Support
 
@@ -170,6 +193,73 @@ All gradient-based presets support these weather states:
 | ⚠️ Exceptional | — |
 
 All animations are deliberately slow and relaxed — designed to run all day without being distracting.
+
+---
+
+## 📱 Per-Device Presets
+
+Different devices can show different presets. For example, use CSS gradients on mobile (zero data) and classic videos on desktop:
+
+```yaml
+type: custom:animated-background
+entity: weather.home
+preset: weather
+device_presets:
+  mobile: weather       # Lightweight gradients on phones
+  tablet: ocean         # Calming ocean on tablets
+  desktop: classic      # Full video on desktop
+```
+
+In the visual editor, check **"Override preset per device type"** and select a preset for each device. The device type is detected by screen width:
+- **Mobile**: ≤600px
+- **Tablet**: ≤1024px
+- **Desktop**: >1024px
+
+Leave a device on "Use main preset" to fall back to the main preset.
+
+---
+
+## 🔲 Static Gradient Mode
+
+Want the particles (rain, snow, stars) but prefer a fixed background color?
+
+```yaml
+type: custom:animated-background
+preset: weather
+static_gradient: true
+particles: true
+```
+
+The gradient stays at a fixed position while particles still animate on top.
+
+---
+
+## 🌀 Blur Effect & Idle Screensaver
+
+### Constant Background Blur
+
+Add a subtle blur to the background for a softer, more ambient look:
+
+```yaml
+type: custom:animated-background
+preset: weather
+blur: 5   # 0–30 pixels
+```
+
+### Idle Screensaver
+
+After a period of inactivity (no mouse, keyboard, or touch), the background smoothly blurs and dims. Any interaction instantly restores it:
+
+```yaml
+type: custom:animated-background
+preset: aurora
+idle_blur: true
+idle_timeout: 60        # Seconds before activating (5–300)
+idle_blur_strength: 8   # Blur in pixels (1–30)
+idle_dim: 0.3           # Dim amount (0–0.8, higher = darker)
+```
+
+This works great for wall-mounted tablets or kiosk dashboards — the screen becomes a subtle ambient display when not in use.
 
 ---
 

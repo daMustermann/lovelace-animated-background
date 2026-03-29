@@ -4,9 +4,10 @@
 // https://github.com/daMustermann/lovelace-animated-background
 // ============================================================
 
-const CARD_VERSION = '2.0.0';
+const CARD_VERSION = '2.2.0';
 const CARD_NAME = 'animated-background';
 const BG_CONTAINER_ID = 'ab-container';
+const AB_CACHE_NAME = 'animated-background-classic-videos';
 
 console.info(
   `%c ANIMATED BACKGROUND %c v${CARD_VERSION} %c by Maudersoft `,
@@ -225,6 +226,24 @@ const CLASSIC_VIDEOS = {
 
 const CLASSIC_DEFAULT = 'https://cdn.flixel.com/flixel/ypy8bw9fgw1zv2b4htp2.hd.mp4';
 
+function _getAllClassicUrls() {
+  const urls = new Set();
+  for (const vids of Object.values(CLASSIC_VIDEOS)) {
+    for (const v of (Array.isArray(vids) ? vids : [vids])) urls.add(v);
+  }
+  urls.add(CLASSIC_DEFAULT);
+  return [...urls];
+}
+
+async function _getCachedUrl(url) {
+  try {
+    const cache = await caches.open(AB_CACHE_NAME);
+    const resp = await cache.match(url);
+    if (resp) return URL.createObjectURL(await resp.blob());
+  } catch (_) {}
+  return null;
+}
+
 // --- Preset registry ---
 
 const PRESETS = {
@@ -393,6 +412,13 @@ function randomFrom(val) {
   return val[Math.floor(Math.random() * val.length)];
 }
 
+function _detectDeviceType() {
+  const w = window.innerWidth;
+  if (w <= 600) return 'mobile';
+  if (w <= 1024) return 'tablet';
+  return 'desktop';
+}
+
 // ============================================================
 // Main Card
 // ============================================================
@@ -430,6 +456,9 @@ class AnimatedBackground extends HTMLElement {
     this._viewObs = null;
     this._transTimer = null;
     this._flashTimer = null;
+    this._idleTimer = null;
+    this._isIdle = false;
+    this._idleListeners = [];
   }
 
   /* --- Lifecycle --- */
@@ -439,19 +468,34 @@ class AnimatedBackground extends HTMLElement {
     const oldEntity = this._config.entity;
     const oldPreset = this._config.preset;
 
+    // Resolve per-device preset
+    const deviceType = _detectDeviceType();
+    const devicePresets = config.device_presets || {};
+    const resolvedPreset = devicePresets[deviceType] || config.preset || 'none';
+
     this._config = {
       entity:              config.entity || '',
-      preset:              config.preset || 'none',
+      preset:              resolvedPreset,
+      device_presets:      config.device_presets || {},
       default_url:         config.default_url || '',
       state_url:           config.state_url || {},
       transition_duration: config.transition_duration !== undefined ? config.transition_duration : 2,
       overlay:             config.overlay !== undefined ? config.overlay : 'rgba(0,0,0,0.15)',
       particles:           config.particles !== undefined ? config.particles : true,
+      static_gradient:     config.static_gradient !== undefined ? config.static_gradient : false,
       card_opacity:        config.card_opacity !== undefined ? config.card_opacity : 0.88,
       show_card:           config.show_card !== undefined ? config.show_card : true,
       transparent_header:  config.transparent_header !== undefined ? config.transparent_header : true,
+      blur:                config.blur !== undefined ? config.blur : 0,
+      idle_blur:           config.idle_blur !== undefined ? config.idle_blur : false,
+      idle_timeout:        config.idle_timeout !== undefined ? config.idle_timeout : 60,
+      idle_blur_strength:  config.idle_blur_strength !== undefined ? config.idle_blur_strength : 8,
+      idle_dim:            config.idle_dim !== undefined ? config.idle_dim : 0.3,
       debug:               config.debug || false,
     };
+
+    // Store raw preset for saving back (not the resolved one)
+    this._rawPreset = config.preset || 'none';
 
     this._renderCard();
 
@@ -460,6 +504,10 @@ class AnimatedBackground extends HTMLElement {
       this._prevUrl = null;
       this._prevParticles = null;
       this._setupBackground();
+    }
+    if (this._connected) {
+      this._applyBlur();
+      this._setupIdleWatcher();
     }
   }
 
@@ -485,7 +533,7 @@ class AnimatedBackground extends HTMLElement {
 
   getCardSize() { return this._config.show_card ? 1 : 0; }
 
-  connectedCallback()    { this._connected = true;  this._retries = 0; this._setupBackground(); }
+  connectedCallback()    { this._connected = true;  this._retries = 0; this._setupBackground(); this._setupIdleWatcher(); }
   disconnectedCallback() { this._connected = false; this._cleanup(); }
 
   /* --- Helpers --- */
@@ -568,6 +616,7 @@ class AnimatedBackground extends HTMLElement {
     this._injectGlobal();
     this._createContainer();
     this._makeTransparent();
+    this._applyBlur();
     this._updateBackground();
   }
 
@@ -725,23 +774,33 @@ class AnimatedBackground extends HTMLElement {
       this._currentLayer = this._currentLayer === 'a' ? 'b' : 'a';
     };
 
-    if (isVideoUrl(url)) {
-      const v = document.createElement('video');
-      v.autoplay = true; v.loop = true; v.muted = true; v.playsInline = true;
-      v.setAttribute('playsinline', '');
-      const src = document.createElement('source');
-      src.src = url; src.type = getVideoType(url);
-      v.appendChild(src);
-      next.appendChild(v);
-      v.addEventListener('canplay', () => { v.play().catch(() => {}); swap(); }, { once: true });
-      v.addEventListener('error', () => console.warn('Animated Background: video load failed', url), { once: true });
-    } else {
-      const img = document.createElement('img');
-      img.src = url; img.alt = '';
-      next.appendChild(img);
-      img.addEventListener('load', swap, { once: true });
-      img.addEventListener('error', () => console.warn('Animated Background: image load failed', url), { once: true });
-    }
+    const loadMedia = (resolvedUrl, originalUrl) => {
+      if (isVideoUrl(originalUrl)) {
+        const v = document.createElement('video');
+        v.autoplay = true; v.loop = true; v.muted = true; v.playsInline = true;
+        v.setAttribute('playsinline', '');
+        if (resolvedUrl.startsWith('blob:')) {
+          v.src = resolvedUrl;
+        } else {
+          const src = document.createElement('source');
+          src.src = resolvedUrl; src.type = getVideoType(originalUrl);
+          v.appendChild(src);
+        }
+        next.appendChild(v);
+        v.addEventListener('canplay', () => { v.play().catch(() => {}); swap(); }, { once: true });
+        v.addEventListener('error', () => console.warn('Animated Background: video load failed', originalUrl), { once: true });
+      } else {
+        const img = document.createElement('img');
+        img.src = resolvedUrl; img.alt = '';
+        next.appendChild(img);
+        img.addEventListener('load', swap, { once: true });
+        img.addEventListener('error', () => console.warn('Animated Background: image load failed', originalUrl), { once: true });
+      }
+    };
+
+    _getCachedUrl(url).then(cached => {
+      loadMedia(cached || url, url);
+    });
   }
 
   _toGradient(g) {
@@ -750,7 +809,12 @@ class AnimatedBackground extends HTMLElement {
     next.innerHTML = '';
     next.style.background     = g;
     next.style.backgroundSize = '100% 200%';
-    next.style.animation      = `ab-gradient-shift ${this._getGradientSpeed()} ease infinite`;
+    if (this._config.static_gradient) {
+      next.style.animation = 'none';
+      next.style.backgroundPosition = '50% 50%';
+    } else {
+      next.style.animation = `ab-gradient-shift ${this._getGradientSpeed()} ease infinite`;
+    }
     requestAnimationFrame(() => {
       next.style.opacity = '1'; curr.style.opacity = '0';
       this._currentLayer = this._currentLayer === 'a' ? 'b' : 'a';
@@ -773,6 +837,73 @@ class AnimatedBackground extends HTMLElement {
     };
     flash();
     this._flashTimer = setInterval(flash, 6000 + Math.random() * 12000);
+  }
+
+  /* --- Blur & Idle Screensaver --- */
+
+  _applyBlur() {
+    if (!this._bgContainer) return;
+    const blurVal = this._isIdle ? this._config.idle_blur_strength : this._config.blur;
+    const dimVal = this._isIdle ? this._config.idle_dim : 0;
+    const speed = this._isIdle ? '2s' : '0.5s';
+    this._bgContainer.style.transition = `filter ${speed} ease, opacity ${speed} ease`;
+    this._bgContainer.style.filter = blurVal > 0 ? `blur(${blurVal}px)` : 'none';
+    // Use a dim overlay instead of changing opacity (which would hide particles too)
+    const sr = this._huiRoot?.shadowRoot;
+    if (sr) {
+      let dimEl = sr.getElementById('ab-idle-dim');
+      if (dimVal > 0) {
+        if (!dimEl) {
+          dimEl = document.createElement('div');
+          dimEl.id = 'ab-idle-dim';
+          dimEl.style.cssText = 'position:fixed;inset:0;z-index:-9;pointer-events:none;background:black;transition:opacity 2s ease;opacity:0';
+          this._bgContainer.parentNode.insertBefore(dimEl, this._bgContainer.nextSibling);
+        }
+        requestAnimationFrame(() => { dimEl.style.opacity = String(dimVal); });
+      } else if (dimEl) {
+        dimEl.style.opacity = '0';
+      }
+    }
+  }
+
+  _setupIdleWatcher() {
+    this._teardownIdleWatcher();
+    if (!this._config.idle_blur || !this._connected) return;
+
+    const timeout = Math.max(5, this._config.idle_timeout) * 1000;
+
+    const resetIdle = () => {
+      if (this._isIdle) {
+        this._isIdle = false;
+        this._applyBlur();
+      }
+      clearTimeout(this._idleTimer);
+      this._idleTimer = setTimeout(() => {
+        this._isIdle = true;
+        this._applyBlur();
+      }, timeout);
+    };
+
+    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'wheel'];
+    events.forEach(evt => {
+      const handler = () => resetIdle();
+      document.addEventListener(evt, handler, { passive: true });
+      this._idleListeners.push({ evt, handler });
+    });
+
+    // Start the timer
+    resetIdle();
+  }
+
+  _teardownIdleWatcher() {
+    clearTimeout(this._idleTimer);
+    this._idleTimer = null;
+    this._idleListeners.forEach(({ evt, handler }) => document.removeEventListener(evt, handler));
+    this._idleListeners = [];
+    if (this._isIdle) {
+      this._isIdle = false;
+      this._applyBlur();
+    }
   }
 
   /* --- Card Display --- */
@@ -834,8 +965,9 @@ class AnimatedBackground extends HTMLElement {
   /* --- Cleanup --- */
 
   _cleanup() {
+    this._teardownIdleWatcher();
     const sr = this._huiRoot?.shadowRoot;
-    if (sr) ['ab-container','ab-mstyles','ab-gstyles','ab-trans','ab-opac','ab-hdr'].forEach(id => sr.getElementById(id)?.remove());
+    if (sr) ['ab-container','ab-mstyles','ab-gstyles','ab-trans','ab-opac','ab-hdr','ab-idle-dim'].forEach(id => sr.getElementById(id)?.remove());
     if (this._viewObs)    { this._viewObs.disconnect(); this._viewObs = null; }
     if (this._transTimer) { clearInterval(this._transTimer); this._transTimer = null; }
     if (this._flashTimer) { clearInterval(this._flashTimer); this._flashTimer = null; }
@@ -855,22 +987,32 @@ class AnimatedBackgroundEditor extends HTMLElement {
     this.attachShadow({ mode: 'open' });
     this._config = {};
     this._hass = null;
+    this._rendered = false;
+    this._cacheProgress = null;
   }
 
   set hass(h) {
     this._hass = h;
     const p = this.shadowRoot?.querySelector('ha-entity-picker');
-    if (p) p.hass = h;
+    if (p) { p.hass = h; }
   }
 
   setConfig(config) {
     this._config = Object.assign({
-      entity: '', preset: 'none', default_url: '', state_url: {},
+      entity: '', preset: 'none', device_presets: {}, default_url: '', state_url: {},
       transition_duration: 2, overlay: 'rgba(0,0,0,0.15)',
-      particles: true, card_opacity: 0.88, show_card: true,
-      transparent_header: true, debug: false,
+      particles: true, static_gradient: false,
+      card_opacity: 0.88, show_card: true,
+      transparent_header: true, blur: 0,
+      idle_blur: false, idle_timeout: 60, idle_blur_strength: 8, idle_dim: 0.3,
+      debug: false,
     }, config);
-    this._render();
+    if (!this._rendered) {
+      this._render();
+      this._rendered = true;
+    } else {
+      this._updateValues();
+    }
   }
 
   _render() {
@@ -894,7 +1036,8 @@ class AnimatedBackgroundEditor extends HTMLElement {
         .r label{display:block;font-weight:500;margin-bottom:6px;font-size:14px;color:var(--primary-text-color)}
         .h{font-size:12px;color:var(--secondary-text-color);margin-top:4px}
         ha-entity-picker{display:block;width:100%}
-        select,input[type="text"]{width:100%;padding:10px 12px;border:1px solid var(--divider-color,#e0e0e0);border-radius:8px;background:var(--card-background-color,#fff);color:var(--primary-text-color,#333);font-size:14px;box-sizing:border-box;font-family:inherit}
+        select,input[type="text"],input[type="number"]{width:100%;padding:10px 12px;border:1px solid var(--divider-color,#e0e0e0);border-radius:8px;background:var(--card-background-color,#fff);color:var(--primary-text-color,#333);font-size:14px;box-sizing:border-box;font-family:inherit}
+        input[type="number"]{width:80px}
         .tg{display:flex;align-items:center;justify-content:space-between}.tg label{margin-bottom:0}
         .sl{display:flex;align-items:center;gap:12px}.sl label{flex-shrink:0;margin-bottom:0}.sl input[type="range"]{flex:1}
         .sv{min-width:44px;text-align:right;font-size:14px;color:var(--secondary-text-color)}
@@ -906,6 +1049,28 @@ class AnimatedBackgroundEditor extends HTMLElement {
         .b:hover{background:var(--primary-color);color:#fff}
         .x{padding:4px 8px;border:none;background:transparent;color:var(--error-color,#f44);cursor:pointer;font-size:18px;line-height:1}
         .presets-info{background:var(--secondary-background-color,#f5f5f5);border-radius:8px;padding:10px 14px;margin-top:6px;font-size:12px;color:var(--secondary-text-color);line-height:1.5}
+        .cache-section{background:var(--secondary-background-color,#f5f5f5);border-radius:8px;padding:14px;margin-top:10px}
+        .cache-section .h{margin-top:6px}
+        .cache-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border:1px solid var(--primary-color);border-radius:8px;background:transparent;color:var(--primary-color);cursor:pointer;font-size:13px;font-weight:500;font-family:inherit;transition:background .2s,color .2s}
+        .cache-btn:hover{background:var(--primary-color);color:#fff}
+        .cache-btn:disabled{opacity:.5;cursor:not-allowed}
+        .cache-btn.del{border-color:var(--error-color,#f44);color:var(--error-color,#f44)}
+        .cache-btn.del:hover{background:var(--error-color,#f44);color:#fff}
+        .cache-progress{margin-top:8px;font-size:12px;color:var(--secondary-text-color)}
+        .cache-bar{width:100%;height:6px;border-radius:3px;background:var(--divider-color,#e0e0e0);margin-top:6px;overflow:hidden}
+        .cache-bar-fill{height:100%;border-radius:3px;background:var(--primary-color);transition:width .3s ease}
+        .cache-status{display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:12px;font-weight:500}
+        .cache-status .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+        .cache-status .dot.cached{background:#4caf50}
+        .cache-status .dot.not-cached{background:var(--divider-color,#ccc)}
+        .dp-grid{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center;margin-top:8px}
+        .dp-grid label{font-size:13px;font-weight:400;margin-bottom:0}
+        .dp-grid select{padding:6px 8px;font-size:13px;border-radius:6px;border:1px solid var(--divider-color,#e0e0e0);background:var(--card-background-color,#fff);color:var(--primary-text-color);font-family:inherit}
+        .sub-section{background:var(--secondary-background-color,#f5f5f5);border-radius:8px;padding:12px 14px;margin-top:8px}
+        .sub-section .r{margin-bottom:10px}
+        .sub-section .r:last-child{margin-bottom:0}
+        .idle-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+        .idle-grid .r{margin-bottom:0}
       </style>
       <div class="e">
         <div class="st">General</div>
@@ -919,6 +1084,29 @@ class AnimatedBackgroundEditor extends HTMLElement {
             <b>Sunset</b> \u2014 Warm amber, orange, pink earth tones<br>
             <b>Classic</b> \u2014 Original cinemagraph videos from Flixel (uses internet)
           </div>
+          <div class="cache-section" id="cache-section" style="display:none">
+            <div class="cache-status" id="cache-status"><span class="dot not-cached"></span> Checking cache\u2026</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="cache-btn" id="cache-dl">\u2B07\uFE0F Download for Offline</button>
+              <button class="cache-btn del" id="cache-rm" style="display:none">\uD83D\uDDD1\uFE0F Clear Cache</button>
+            </div>
+            <div class="cache-progress" id="cache-prog" style="display:none">
+              <span id="cache-txt">Downloading\u2026</span>
+              <div class="cache-bar"><div class="cache-bar-fill" id="cache-fill" style="width:0%"></div></div>
+            </div>
+            <div class="h">Downloads all classic preset videos to your browser for offline use. Videos are stored in the browser cache \u2014 no internet required after download.</div>
+          </div>
+        </div>
+        <div class="r"><label>Per-Device Presets</label>
+          <div class="r tg" style="margin-bottom:8px"><label>Override preset per device type</label><input type="checkbox" id="dp-en"${Object.keys(c.device_presets||{}).length>0?' checked':''}></div>
+          <div id="dp-wrap" style="display:${Object.keys(c.device_presets||{}).length>0?'block':'none'}">
+            <div class="dp-grid">
+              <label>\uD83D\uDCF1 Mobile (\u2264600px)</label><select id="dp-mobile">${this._presetOpts(c.device_presets?.mobile||'')}</select>
+              <label>\uD83D\uDCCA Tablet (\u22641024px)</label><select id="dp-tablet">${this._presetOpts(c.device_presets?.tablet||'')}</select>
+              <label>\uD83D\uDDA5\uFE0F Desktop (&gt;1024px)</label><select id="dp-desktop">${this._presetOpts(c.device_presets?.desktop||'')}</select>
+            </div>
+            <div class="h">When set, the device-specific preset overrides the main preset above. Leave on \u201CUse main preset\u201D to fall back to the main preset. Current device: <b>${_detectDeviceType()}</b>.</div>
+          </div>
         </div>
         <div class="r"><label>Default Background URL</label><input type="text" id="du" value="${this._esc(c.default_url)}" placeholder="/local/videos/background.mp4"/><div class="h">Fallback video/image URL (.mp4, .webm, images).</div></div>
         <div class="st">Appearance</div>
@@ -926,8 +1114,22 @@ class AnimatedBackgroundEditor extends HTMLElement {
         <div class="r sl"><label>Card Opacity</label><input type="range" id="co" min="0.3" max="1.0" step="0.02" value="${c.card_opacity}"/><span class="sv" id="ov">${Math.round(c.card_opacity*100)}%</span></div>
         <div class="r"><label>Overlay Color</label><input type="text" id="ol" value="${this._esc(c.overlay)}" placeholder="rgba(0,0,0,0.15)"/><div class="h">CSS color for readability overlay. 'none' to disable.</div></div>
         <div class="r tg"><label>Particle Effects</label><input type="checkbox" id="pa"${c.particles?' checked':''}></div>
+        <div class="r tg"><label>Static Gradient (no animation)</label><input type="checkbox" id="sg"${c.static_gradient?' checked':''}></div>
+        <div class="h" style="margin-top:-12px;margin-bottom:12px">Keep background gradient static while particles still animate.</div>
         <div class="r tg"><label>Transparent Header</label><input type="checkbox" id="th"${c.transparent_header!==false?' checked':''}></div>
         <div class="r tg"><label>Show Status Card</label><input type="checkbox" id="sc"${c.show_card!==false?' checked':''}></div>
+        <div class="st">Blur</div>
+        <div class="r sl"><label>Background Blur</label><input type="range" id="bl" min="0" max="30" step="1" value="${c.blur||0}"/><span class="sv" id="blv">${c.blur||0}px</span></div>
+        <div class="h" style="margin-top:-12px;margin-bottom:16px">Apply a constant blur to the background. 0 = no blur.</div>
+        <div class="r tg"><label>Idle Blur (Screensaver)</label><input type="checkbox" id="ib"${c.idle_blur?' checked':''}></div>
+        <div class="sub-section" id="idle-wrap" style="display:${c.idle_blur?'block':'none'}">
+          <div class="h" style="margin-top:0;margin-bottom:10px">After a period of inactivity, the background blurs and dims. Interaction instantly restores it.</div>
+          <div class="idle-grid">
+            <div class="r sl"><label>Timeout</label><input type="range" id="it" min="5" max="300" step="5" value="${c.idle_timeout||60}"/><span class="sv" id="itv">${c.idle_timeout||60}s</span></div>
+            <div class="r sl"><label>Blur Strength</label><input type="range" id="ibs" min="1" max="30" step="1" value="${c.idle_blur_strength||8}"/><span class="sv" id="ibsv">${c.idle_blur_strength||8}px</span></div>
+            <div class="r sl"><label>Dim Amount</label><input type="range" id="idm" min="0" max="0.8" step="0.05" value="${c.idle_dim||0.3}"/><span class="sv" id="idmv">${Math.round((c.idle_dim||0.3)*100)}%</span></div>
+          </div>
+        </div>
         <div class="st">Custom State Backgrounds</div>
         <div id="su"></div>
         <button class="b" id="as">+ Add State</button>
@@ -936,13 +1138,78 @@ class AnimatedBackgroundEditor extends HTMLElement {
     this._bind();
   }
 
+  _updateValues() {
+    const sr = this.shadowRoot;
+    const c = this._config;
+    const pk = sr.querySelector('ha-entity-picker');
+    if (pk && pk.value !== (c.entity || '')) pk.value = c.entity || '';
+    const ps = sr.getElementById('ps');
+    if (ps && ps.value !== c.preset) ps.value = c.preset;
+    const du = sr.getElementById('du');
+    if (du && du.value !== (c.default_url || '')) du.value = c.default_url || '';
+    const td = sr.getElementById('td');
+    if (td) { td.value = c.transition_duration; sr.getElementById('tv').textContent = c.transition_duration + 's'; }
+    const co = sr.getElementById('co');
+    if (co) { co.value = c.card_opacity; sr.getElementById('ov').textContent = Math.round(c.card_opacity * 100) + '%'; }
+    const ol = sr.getElementById('ol');
+    if (ol && ol.value !== (c.overlay || '')) ol.value = c.overlay || '';
+    sr.getElementById('pa').checked = !!c.particles;
+    sr.getElementById('sg').checked = !!c.static_gradient;
+    sr.getElementById('th').checked = c.transparent_header !== false;
+    sr.getElementById('sc').checked = c.show_card !== false;
+    // Blur
+    const bl = sr.getElementById('bl');
+    if (bl) { bl.value = c.blur || 0; sr.getElementById('blv').textContent = (c.blur || 0) + 'px'; }
+    sr.getElementById('ib').checked = !!c.idle_blur;
+    sr.getElementById('idle-wrap').style.display = c.idle_blur ? 'block' : 'none';
+    const it = sr.getElementById('it');
+    if (it) { it.value = c.idle_timeout || 60; sr.getElementById('itv').textContent = (c.idle_timeout || 60) + 's'; }
+    const ibs = sr.getElementById('ibs');
+    if (ibs) { ibs.value = c.idle_blur_strength || 8; sr.getElementById('ibsv').textContent = (c.idle_blur_strength || 8) + 'px'; }
+    const idm = sr.getElementById('idm');
+    if (idm) { idm.value = c.idle_dim || 0.3; sr.getElementById('idmv').textContent = Math.round((c.idle_dim || 0.3) * 100) + '%'; }
+    // Device presets
+    const dpEn = sr.getElementById('dp-en');
+    const hasDP = Object.keys(c.device_presets || {}).length > 0;
+    dpEn.checked = hasDP;
+    sr.getElementById('dp-wrap').style.display = hasDP ? 'block' : 'none';
+    if (hasDP) {
+      const dpm = sr.getElementById('dp-mobile'); if (dpm) dpm.value = c.device_presets?.mobile || '';
+      const dpt = sr.getElementById('dp-tablet'); if (dpt) dpt.value = c.device_presets?.tablet || '';
+      const dpd = sr.getElementById('dp-desktop'); if (dpd) dpd.value = c.device_presets?.desktop || '';
+    }
+    this._renderStates();
+    this._updateCacheSection();
+  }
+
   _esc(s) { return (s || '').replace(/"/g, '&quot;'); }
+
+  _presetOpts(selected) {
+    const options = [
+      { value: '', label: 'Use main preset' },
+      { value: 'weather', label: '\u2600\uFE0F Weather' },
+      { value: 'night-sky', label: '\uD83C\uDF0C Night Sky' },
+      { value: 'aurora', label: '\uD83C\uDF0C Aurora' },
+      { value: 'ocean', label: '\uD83C\uDF0A Ocean' },
+      { value: 'sunset', label: '\uD83C\uDF05 Sunset' },
+      { value: 'classic', label: '\uD83C\uDFAC Classic' },
+      { value: 'none', label: 'None' },
+    ];
+    return options.map(o => `<option value="${o.value}"${selected===o.value?' selected':''}>${o.label}</option>`).join('');
+  }
 
   _bind() {
     const sr = this.shadowRoot;
     const pk = sr.querySelector('ha-entity-picker');
-    if (pk) { pk.hass = this._hass; pk.value = this._config.entity || ''; pk.addEventListener('value-changed', e => this._set('entity', e.detail.value || '')); }
-    sr.getElementById('ps').addEventListener('change', e => this._set('preset', e.target.value));
+    if (pk) {
+      pk.hass = this._hass;
+      pk.value = this._config.entity || '';
+      pk.addEventListener('value-changed', e => {
+        e.stopPropagation();
+        this._set('entity', e.detail.value || '');
+      });
+    }
+    sr.getElementById('ps').addEventListener('change', e => { this._set('preset', e.target.value); this._updateCacheSection(); });
     sr.getElementById('du').addEventListener('change', e => this._set('default_url', e.target.value));
     const td = sr.getElementById('td');
     td.addEventListener('input', e => { sr.getElementById('tv').textContent = e.target.value+'s'; this._set('transition_duration', parseFloat(e.target.value)); });
@@ -950,10 +1217,135 @@ class AnimatedBackgroundEditor extends HTMLElement {
     co.addEventListener('input', e => { sr.getElementById('ov').textContent = Math.round(e.target.value*100)+'%'; this._set('card_opacity', parseFloat(e.target.value)); });
     sr.getElementById('ol').addEventListener('change', e => this._set('overlay', e.target.value));
     sr.getElementById('pa').addEventListener('change', e => this._set('particles', e.target.checked));
+    sr.getElementById('sg').addEventListener('change', e => this._set('static_gradient', e.target.checked));
     sr.getElementById('th').addEventListener('change', e => this._set('transparent_header', e.target.checked));
     sr.getElementById('sc').addEventListener('change', e => this._set('show_card', e.target.checked));
+    // Blur
+    const bl = sr.getElementById('bl');
+    bl.addEventListener('input', e => { sr.getElementById('blv').textContent = e.target.value + 'px'; this._set('blur', parseInt(e.target.value)); });
+    sr.getElementById('ib').addEventListener('change', e => {
+      this._set('idle_blur', e.target.checked);
+      sr.getElementById('idle-wrap').style.display = e.target.checked ? 'block' : 'none';
+    });
+    const it = sr.getElementById('it');
+    it.addEventListener('input', e => { sr.getElementById('itv').textContent = e.target.value + 's'; this._set('idle_timeout', parseInt(e.target.value)); });
+    const ibs = sr.getElementById('ibs');
+    ibs.addEventListener('input', e => { sr.getElementById('ibsv').textContent = e.target.value + 'px'; this._set('idle_blur_strength', parseInt(e.target.value)); });
+    const idm = sr.getElementById('idm');
+    idm.addEventListener('input', e => { sr.getElementById('idmv').textContent = Math.round(e.target.value * 100) + '%'; this._set('idle_dim', parseFloat(e.target.value)); });
+    // Device presets
+    const dpEn = sr.getElementById('dp-en');
+    dpEn.addEventListener('change', e => {
+      if (e.target.checked) {
+        this._set('device_presets', { mobile: '', tablet: '', desktop: '' });
+      } else {
+        this._set('device_presets', {});
+      }
+      sr.getElementById('dp-wrap').style.display = e.target.checked ? 'block' : 'none';
+    });
+    ['mobile', 'tablet', 'desktop'].forEach(dev => {
+      sr.getElementById('dp-' + dev).addEventListener('change', e => {
+        const dp = { ...(this._config.device_presets || {}) };
+        if (e.target.value) dp[dev] = e.target.value; else delete dp[dev];
+        this._set('device_presets', dp);
+      });
+    });
+    // Cache & states
+    sr.getElementById('cache-dl').addEventListener('click', () => this._downloadClassicVideos());
+    sr.getElementById('cache-rm').addEventListener('click', () => this._clearClassicCache());
     this._renderStates();
     sr.getElementById('as').addEventListener('click', () => { this._config.state_url = { ...this._config.state_url, '': '' }; this._renderStates(); });
+    this._updateCacheSection();
+  }
+
+  _updateCacheSection() {
+    const sr = this.shadowRoot;
+    const section = sr.getElementById('cache-section');
+    if (!section) return;
+    section.style.display = this._config.preset === 'classic' ? '' : 'none';
+    if (this._config.preset === 'classic') this._checkCacheStatus();
+  }
+
+  async _checkCacheStatus() {
+    const sr = this.shadowRoot;
+    const statusEl = sr.getElementById('cache-status');
+    const dlBtn = sr.getElementById('cache-dl');
+    const rmBtn = sr.getElementById('cache-rm');
+    if (!statusEl) return;
+
+    try {
+      const urls = _getAllClassicUrls();
+      const cache = await caches.open(AB_CACHE_NAME);
+      let cached = 0;
+      for (const url of urls) {
+        const resp = await cache.match(url);
+        if (resp) cached++;
+      }
+      const total = urls.length;
+      if (cached === 0) {
+        statusEl.innerHTML = '<span class="dot not-cached"></span> Not cached \u2014 videos stream from CDN';
+        dlBtn.style.display = ''; rmBtn.style.display = 'none';
+        dlBtn.textContent = '\u2B07\uFE0F Download All for Offline (' + total + ' videos)';
+      } else if (cached < total) {
+        statusEl.innerHTML = '<span class="dot cached" style="background:#ff9800"></span> Partially cached (' + cached + '/' + total + ' videos)';
+        dlBtn.style.display = ''; rmBtn.style.display = '';
+        dlBtn.textContent = '\u2B07\uFE0F Download Remaining (' + (total - cached) + ' videos)';
+      } else {
+        statusEl.innerHTML = '<span class="dot cached"></span> All ' + total + ' videos cached for offline use';
+        dlBtn.style.display = 'none'; rmBtn.style.display = '';
+      }
+    } catch (e) {
+      statusEl.innerHTML = '<span class="dot not-cached"></span> Cache API not available';
+      dlBtn.disabled = true;
+    }
+  }
+
+  async _downloadClassicVideos() {
+    const sr = this.shadowRoot;
+    const dlBtn = sr.getElementById('cache-dl');
+    const progDiv = sr.getElementById('cache-prog');
+    const progTxt = sr.getElementById('cache-txt');
+    const progFill = sr.getElementById('cache-fill');
+
+    dlBtn.disabled = true;
+    progDiv.style.display = '';
+
+    try {
+      const urls = _getAllClassicUrls();
+      const cache = await caches.open(AB_CACHE_NAME);
+      let done = 0;
+      const total = urls.length;
+
+      for (const url of urls) {
+        const existing = await cache.match(url);
+        if (existing) { done++; continue; }
+        progTxt.textContent = 'Downloading ' + (done + 1) + ' of ' + total + '\u2026';
+        progFill.style.width = Math.round((done / total) * 100) + '%';
+        try {
+          const resp = await fetch(url, { mode: 'cors' });
+          if (resp.ok) await cache.put(url, resp);
+        } catch (err) {
+          console.warn('Animated Background: failed to cache', url, err);
+        }
+        done++;
+        progFill.style.width = Math.round((done / total) * 100) + '%';
+      }
+
+      progTxt.textContent = 'Done! All ' + total + ' videos cached.';
+      progFill.style.width = '100%';
+      setTimeout(() => { progDiv.style.display = 'none'; }, 3000);
+    } catch (e) {
+      progTxt.textContent = 'Error: ' + e.message;
+    }
+    dlBtn.disabled = false;
+    this._checkCacheStatus();
+  }
+
+  async _clearClassicCache() {
+    try {
+      await caches.delete(AB_CACHE_NAME);
+    } catch (_) {}
+    this._checkCacheStatus();
   }
 
   _renderStates() {
