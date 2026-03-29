@@ -12,12 +12,14 @@ Beautiful, dynamic animated backgrounds for your Home Assistant dashboards. Work
 
 ## ✨ Features
 
-- **Weather Preset** — Animated sky gradients for all 15 weather states, zero config needed
+- **6 Built-in Presets** — Weather, Night Sky, Aurora, Ocean, Sunset, Classic Videos
+- **Relaxed Animations** — Slow, gentle particles and gradient shifts — designed for all-day use
 - **Day/Night Aware** — Automatically adjusts colors based on `sun.sun` entity
 - **Particle Effects** — Rain, snow, twinkling stars, hail (GPU-accelerated CSS)
 - **Lightning Flashes** — Realistic random flashes during thunderstorms
 - **Smooth Crossfade** — Seamless transitions when weather/state changes
 - **Video & Image Support** — Use .mp4, .webm, or any image as background
+- **Classic Cinemagraph Videos** — Original Flixel video collection as a one-click preset
 - **Visual Editor** — Configure everything through the HA card editor UI
 - **Transparent Header** — Frosted-glass effect on the toolbar
 - **Adjustable Card Opacity** — Control how translucent your dashboard cards appear
@@ -71,7 +73,7 @@ All options can be set via the **visual editor** (click the card → edit). You 
 ```yaml
 type: custom:animated-background
 entity: weather.home       # Entity to track (auto-detected if empty)
-preset: weather            # 'weather' or 'none'
+preset: weather            # weather / night-sky / aurora / ocean / sunset / classic / none
 ```
 
 ### Full Options
@@ -79,7 +81,7 @@ preset: weather            # 'weather' or 'none'
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `entity` | string | *(auto-detected)* | Entity whose state drives the background. Weather entities recommended. |
-| `preset` | string | `none` | `weather` for built-in animated gradients + particles, `none` for custom only. |
+| `preset` | string | `none` | `weather`, `night-sky`, `aurora`, `ocean`, `sunset`, `classic`, or `none`. See presets below. |
 | `default_url` | string/list | `''` | Fallback background URL. Supports `.mp4`, `.webm`, images. Use a list for random selection. |
 | `state_url` | map | `{}` | Map of entity states to background URLs. Overrides preset gradients. |
 | `transition_duration` | number | `1.5` | Crossfade duration in seconds (0.3–5). |
@@ -92,28 +94,82 @@ preset: weather            # 'weather' or 'none'
 
 ---
 
-## 🌦️ Weather Preset
+## � Presets
 
-When `preset: weather` is set, the card automatically creates beautiful animated gradients for all standard Home Assistant weather states:
+Choose a preset in the visual editor or set `preset:` in YAML. All presets respond to your weather entity's state and include day/night awareness.
 
-| State | Day | Night |
-|-------|-----|-------|
-| ☀️ Sunny | Bright blue sky | → switches to Clear Night |
-| 🌙 Clear Night | — | Deep navy with twinkling stars |
-| ⛅ Partly Cloudy | Blue-grey gradient | Dark navy-grey |
-| ☁️ Cloudy | Grey gradient | Darker grey |
-| 🌧️ Rainy | Dark blue-grey + rain drops | Even darker + rain |
-| 🌧️ Pouring | Very dark + heavy rain | Deepest dark + heavy rain |
-| ⛈️ Lightning Rainy | Dark + rain + lightning flashes | Same + lightning |
-| 🌩️ Lightning | Dark + lightning flashes | Same |
-| ❄️ Snowy | Cool grey-white + snowflakes | Blue-purple + snow |
-| 🌨️ Snowy Rainy | Grey + snowflakes | Same |
-| 🌨️ Hail | Grey + hail particles | Same |
-| 🌫️ Fog | Soft grey gradient | Dark grey |
-| 💨 Windy | Blue sky gradient | Dark blue |
-| ⚠️ Exceptional | Dramatic red gradient | Same |
+### ☀️ `weather` — Sky Gradients + Gentle Particles
 
-All gradients slowly animate for a living, breathing feel. Night detection uses `sun.sun` automatically.
+Relaxed sky gradients for all 15 weather states with gentle rain, snow, twinkling stars, and hail. Gradients shift slowly (~30s cycle). Night variants auto-activate via `sun.sun`.
+
+```yaml
+preset: weather
+```
+
+### 🌌 `night-sky` — Deep Space, Always Dark
+
+Always-dark deep-space color palette — perfect for night owls or dark-themed dashboards. Stars are shown on every weather state, with rain/snow layered on top when appropriate. Gradients shift very slowly (~45s cycle).
+
+```yaml
+preset: night-sky
+```
+
+### 🌌 `aurora` — Northern Lights
+
+Dreamy teal, green, and purple northern-lights gradients at a slight angle. Stars appear on clear nights; rain and snow still show when it counts. Gradient cycle ~40s.
+
+```yaml
+preset: aurora
+```
+
+### 🌊 `ocean` — Calming Water Tones
+
+Deep blues, teals, and seafoam greens. A calming palette that works beautifully with both day and night. ~35s gradient cycle.
+
+```yaml
+preset: ocean
+```
+
+### 🌅 `sunset` — Warm Amber & Earth Tones
+
+Warm amber, orange, pink, and earth tones during the day. Shifts to deep purple/navy at night. Perfect for cozy, inviting dashboards. ~35s gradient cycle.
+
+```yaml
+preset: sunset
+```
+
+### 🎬 `classic` — Original Cinemagraph Videos
+
+The original Flixel cinemagraph videos from v1 — beautiful looping scene videos for each weather state, streamed from CDN. No CSS gradients, just real video. **Requires internet access.**
+
+```yaml
+preset: classic
+```
+
+Includes videos for: sunny, partly cloudy, cloudy, clear night, fog, rainy, pouring, lightning, snowy, snowy-rainy.
+
+### Weather State Support
+
+All gradient-based presets support these weather states:
+
+| State | Particles |
+|-------|----------|
+| ☀️ Sunny | — |
+| 🌙 Clear Night | ✨ Stars |
+| ⛅ Partly Cloudy | — |
+| ☁️ Cloudy | — |
+| 🌧️ Rainy | 🌧 Gentle rain |
+| 🌧️ Pouring | 🌧 Heavy rain |
+| ⛈️ Lightning Rainy | 🌧 Rain + ⚡ flashes |
+| 🌩️ Lightning | ⚡ Flashes |
+| ❄️ Snowy | ❄ Slow snowflakes |
+| 🌨️ Snowy Rainy | ❄ Snowflakes |
+| 🌨️ Hail | 🧊 Hail |
+| 🌫️ Fog | — |
+| 💨 Windy | — |
+| ⚠️ Exceptional | — |
+
+All animations are deliberately slow and relaxed — designed to run all day without being distracting.
 
 ---
 

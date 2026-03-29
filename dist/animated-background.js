@@ -25,8 +25,10 @@ window.customCards.push({
 });
 
 // ============================================================
-// Weather Presets — Sky-inspired animated gradients
+// PRESET DEFINITIONS
 // ============================================================
+
+// --- Preset 1: weather — Relaxed sky gradients + gentle particles ---
 
 const WEATHER_GRADIENTS = {
   'sunny':           'linear-gradient(180deg, #1565c0 0%, #1e88e5 25%, #42a5f5 50%, #90caf9 75%, #e3f2fd 100%)',
@@ -46,7 +48,7 @@ const WEATHER_GRADIENTS = {
   'exceptional':     'linear-gradient(180deg, #b71c1c 0%, #c62828 25%, #e53935 50%, #ef5350 75%, #ff8a80 100%)',
 };
 
-const NIGHT_GRADIENTS = {
+const WEATHER_NIGHT_GRADIENTS = {
   'partlycloudy':  'linear-gradient(180deg, #0d1b2a 0%, #1a237e 25%, #283593 50%, #455a64 75%, #607d8b 100%)',
   'cloudy':        'linear-gradient(180deg, #0d1b2a 0%, #1a1a2e 25%, #37474f 50%, #455a64 75%, #546e7a 100%)',
   'rainy':         'linear-gradient(180deg, #050510 0%, #0d1117 25%, #1a1a2e 50%, #263238 75%, #37474f 100%)',
@@ -58,13 +60,180 @@ const NIGHT_GRADIENTS = {
 };
 
 const WEATHER_PARTICLE_MAP = {
-  'rainy': 'rain',
-  'pouring': 'heavy-rain',
-  'lightning-rainy': 'rain',
-  'snowy': 'snow',
-  'snowy-rainy': 'snow',
-  'hail': 'hail',
-  'clear-night': 'stars',
+  'rainy': 'rain', 'pouring': 'heavy-rain', 'lightning-rainy': 'rain',
+  'snowy': 'snow', 'snowy-rainy': 'snow', 'hail': 'hail', 'clear-night': 'stars',
+};
+
+// --- Preset 2: night-sky — Deep space chill, always dark ---
+
+const NIGHTSKY_GRADIENTS = {
+  'sunny':           'linear-gradient(180deg, #0f0c29 0%, #302b63 40%, #24243e 100%)',
+  'clear-night':     'linear-gradient(180deg, #020111 0%, #0a0e27 30%, #1a237e 70%, #0d1b2a 100%)',
+  'partlycloudy':    'linear-gradient(180deg, #0d1b2a 0%, #1a237e 35%, #283593 65%, #0d1b2a 100%)',
+  'cloudy':          'linear-gradient(180deg, #0a0e27 0%, #1a1a2e 30%, #263238 70%, #0d1b2a 100%)',
+  'rainy':           'linear-gradient(180deg, #020111 0%, #0d1117 30%, #1a1a2e 60%, #0a0e27 100%)',
+  'pouring':         'linear-gradient(180deg, #000005 0%, #050510 30%, #0d1117 60%, #050510 100%)',
+  'lightning-rainy': 'linear-gradient(180deg, #020111 0%, #0d1117 30%, #1a1a2e 60%, #0a0e27 100%)',
+  'lightning':       'linear-gradient(180deg, #020111 0%, #0d1117 30%, #1a1a2e 60%, #0a0e27 100%)',
+  'snowy':           'linear-gradient(180deg, #1a237e 0%, #283593 30%, #3949ab 70%, #1a237e 100%)',
+  'snowy-rainy':     'linear-gradient(180deg, #1a237e 0%, #283593 35%, #455a64 65%, #1a237e 100%)',
+  'hail':            'linear-gradient(180deg, #0a0e27 0%, #263238 35%, #37474f 65%, #0a0e27 100%)',
+  'fog':             'linear-gradient(180deg, #1a1a2e 0%, #263238 30%, #37474f 60%, #1a1a2e 100%)',
+  'windy':           'linear-gradient(180deg, #020111 0%, #0d1b2a 30%, #1a237e 70%, #020111 100%)',
+  'windy-variant':   'linear-gradient(180deg, #020111 0%, #0d1b2a 30%, #1a237e 70%, #020111 100%)',
+  'exceptional':     'linear-gradient(180deg, #1a0000 0%, #4a0000 40%, #1a0000 100%)',
+};
+
+// Night sky always gets stars; rain/snow layer on top
+const NIGHTSKY_PARTICLE_MAP = {
+  'rainy': 'stars-rain', 'pouring': 'stars-rain', 'lightning-rainy': 'stars-rain',
+  'snowy': 'stars-snow', 'snowy-rainy': 'stars-snow', 'hail': 'stars',
+};
+
+// --- Preset 3: aurora — Northern lights chill gradient ---
+
+const AURORA_GRADIENTS = {
+  'sunny':           'linear-gradient(160deg, #0a0e27 0%, #0f3460 20%, #16c79a 45%, #11999e 65%, #0a0e27 100%)',
+  'clear-night':     'linear-gradient(160deg, #020111 0%, #0a2e4f 20%, #0f9b8e 40%, #16c79a 60%, #0d1b2a 80%, #020111 100%)',
+  'partlycloudy':    'linear-gradient(160deg, #0a0e27 0%, #1a3c5e 20%, #16c79a 45%, #3d9ec7 65%, #0a0e27 100%)',
+  'cloudy':          'linear-gradient(160deg, #0d1b2a 0%, #1a3a4a 25%, #11999e 50%, #1a3a4a 75%, #0d1b2a 100%)',
+  'rainy':           'linear-gradient(160deg, #050510 0%, #0a2e4f 25%, #0f6f6f 50%, #0a2e4f 75%, #050510 100%)',
+  'pouring':         'linear-gradient(160deg, #020208 0%, #0a1e3f 25%, #0a5f5f 50%, #0a1e3f 75%, #020208 100%)',
+  'lightning-rainy': 'linear-gradient(160deg, #050510 0%, #0a2e4f 25%, #0f6f6f 50%, #0a2e4f 75%, #050510 100%)',
+  'lightning':       'linear-gradient(160deg, #050510 0%, #0a2e4f 25%, #0f6f6f 50%, #0a2e4f 75%, #050510 100%)',
+  'snowy':           'linear-gradient(160deg, #1a237e 0%, #283593 25%, #16c79a 50%, #283593 75%, #1a237e 100%)',
+  'snowy-rainy':     'linear-gradient(160deg, #1a237e 0%, #283593 25%, #11999e 50%, #283593 75%, #1a237e 100%)',
+  'hail':            'linear-gradient(160deg, #0d1b2a 0%, #1a3a4a 25%, #11999e 50%, #1a3a4a 75%, #0d1b2a 100%)',
+  'fog':             'linear-gradient(160deg, #0d1b2a 0%, #1a3a4a 25%, #0f9b8e 50%, #1a3a4a 75%, #0d1b2a 100%)',
+  'windy':           'linear-gradient(160deg, #020111 0%, #0f3460 25%, #16c79a 50%, #0f3460 75%, #020111 100%)',
+  'windy-variant':   'linear-gradient(160deg, #020111 0%, #0f3460 25%, #16c79a 50%, #0f3460 75%, #020111 100%)',
+  'exceptional':     'linear-gradient(160deg, #2d0a0a 0%, #6a1b1b 25%, #c7166a 50%, #6a1b1b 75%, #2d0a0a 100%)',
+};
+
+const AURORA_PARTICLE_MAP = {
+  'clear-night': 'stars', 'rainy': 'rain', 'pouring': 'heavy-rain',
+  'lightning-rainy': 'rain', 'snowy': 'snow', 'snowy-rainy': 'snow', 'hail': 'hail',
+};
+
+// --- Preset 4: ocean — Calming ocean/water gradients ---
+
+const OCEAN_GRADIENTS = {
+  'sunny':           'linear-gradient(180deg, #006994 0%, #0097b2 25%, #43b3ae 50%, #7ec8b8 75%, #b8dbd9 100%)',
+  'clear-night':     'linear-gradient(180deg, #001219 0%, #003049 25%, #005f73 50%, #0a9396 75%, #005f73 100%)',
+  'partlycloudy':    'linear-gradient(180deg, #005f73 0%, #0a9396 25%, #78909c 50%, #5f8a8b 75%, #94d2bd 100%)',
+  'cloudy':          'linear-gradient(180deg, #2c3e50 0%, #3d5a6e 25%, #4a7c7e 50%, #5f8a8b 75%, #7c9a92 100%)',
+  'rainy':           'linear-gradient(180deg, #001219 0%, #002430 25%, #003544 50%, #004455 75%, #005566 100%)',
+  'pouring':         'linear-gradient(180deg, #000a0f 0%, #001219 25%, #002430 50%, #003040 75%, #003544 100%)',
+  'lightning-rainy': 'linear-gradient(180deg, #001219 0%, #002430 25%, #003544 50%, #004455 75%, #005566 100%)',
+  'lightning':       'linear-gradient(180deg, #001219 0%, #002430 25%, #003544 50%, #004455 75%, #005566 100%)',
+  'snowy':           'linear-gradient(180deg, #8ecae6 0%, #a3d5e6 25%, #bee1e6 50%, #caf0f8 75%, #e0f7fa 100%)',
+  'snowy-rainy':     'linear-gradient(180deg, #8ecae6 0%, #94b8c4 25%, #7c9a92 50%, #94b8c4 75%, #8ecae6 100%)',
+  'hail':            'linear-gradient(180deg, #2c3e50 0%, #3d5a6e 25%, #4a7c7e 50%, #5f8a8b 75%, #7c9a92 100%)',
+  'fog':             'linear-gradient(180deg, #5f8a8b 0%, #7c9a92 25%, #94b8c4 50%, #b0c4c4 75%, #caf0f8 100%)',
+  'windy':           'linear-gradient(180deg, #003049 0%, #005f73 25%, #0a9396 50%, #43b3ae 75%, #94d2bd 100%)',
+  'windy-variant':   'linear-gradient(180deg, #003049 0%, #005f73 25%, #0a9396 50%, #43b3ae 75%, #94d2bd 100%)',
+  'exceptional':     'linear-gradient(180deg, #3d0000 0%, #6b1e2a 25%, #c05050 50%, #6b1e2a 75%, #3d0000 100%)',
+};
+
+const OCEAN_PARTICLE_MAP = {
+  'clear-night': 'stars', 'rainy': 'rain', 'pouring': 'heavy-rain',
+  'lightning-rainy': 'rain', 'snowy': 'snow', 'snowy-rainy': 'snow', 'hail': 'hail',
+};
+
+// --- Preset 5: sunset — Warm amber/pink tones ---
+
+const SUNSET_GRADIENTS = {
+  'sunny':           'linear-gradient(180deg, #1a237e 0%, #e65100 20%, #ff8f00 40%, #ffab40 60%, #ffe082 80%, #fff8e1 100%)',
+  'clear-night':     'linear-gradient(180deg, #0a0e27 0%, #1a0033 20%, #4a1a5e 40%, #7b2d8e 55%, #2d1b69 80%, #0a0e27 100%)',
+  'partlycloudy':    'linear-gradient(180deg, #37474f 0%, #bf360c 20%, #e65100 40%, #ff8f00 60%, #9e9e9e 80%, #78909c 100%)',
+  'cloudy':          'linear-gradient(180deg, #455a64 0%, #795548 25%, #8d6e63 50%, #a1887f 75%, #bcaaa4 100%)',
+  'rainy':           'linear-gradient(180deg, #1a1a2e 0%, #3e2723 25%, #4e342e 50%, #5d4037 75%, #3e2723 100%)',
+  'pouring':         'linear-gradient(180deg, #0d1117 0%, #2a1a0a 25%, #3e2723 50%, #2a1a0a 75%, #0d1117 100%)',
+  'lightning-rainy': 'linear-gradient(180deg, #1a1a2e 0%, #3e2723 25%, #4e342e 50%, #5d4037 75%, #3e2723 100%)',
+  'lightning':       'linear-gradient(180deg, #1a1a2e 0%, #3e2723 25%, #4e342e 50%, #5d4037 75%, #3e2723 100%)',
+  'snowy':           'linear-gradient(180deg, #e8d5b7 0%, #d7ccc8 25%, #efebe9 50%, #fafafa 75%, #eceff1 100%)',
+  'snowy-rainy':     'linear-gradient(180deg, #bcaaa4 0%, #a1887f 25%, #c8b8a8 50%, #d7ccc8 75%, #bcaaa4 100%)',
+  'hail':            'linear-gradient(180deg, #455a64 0%, #5d4037 25%, #6d4c41 50%, #795548 75%, #78909c 100%)',
+  'fog':             'linear-gradient(180deg, #a1887f 0%, #bcaaa4 25%, #d7ccc8 50%, #e8d5b7 75%, #efebe9 100%)',
+  'windy':           'linear-gradient(180deg, #bf360c 0%, #e65100 25%, #ff8f00 50%, #ffab40 75%, #ffe082 100%)',
+  'windy-variant':   'linear-gradient(180deg, #bf360c 0%, #e65100 25%, #ff8f00 50%, #ffab40 75%, #ffe082 100%)',
+  'exceptional':     'linear-gradient(180deg, #b71c1c 0%, #c62828 25%, #e53935 50%, #ef5350 75%, #ff8a80 100%)',
+};
+
+const SUNSET_PARTICLE_MAP = {
+  'clear-night': 'stars', 'rainy': 'rain', 'pouring': 'heavy-rain',
+  'lightning-rainy': 'rain', 'snowy': 'snow', 'snowy-rainy': 'snow', 'hail': 'hail',
+};
+
+// --- Preset 6: classic — Original flixel cinemagraph videos ---
+
+const CLASSIC_VIDEOS = {
+  'sunny': [
+    'https://cdn.flixel.com/flixel/hlhff0h8md4ev0kju5be.hd.mp4',
+    'https://cdn.flixel.com/flixel/zjqsoc6ecqhntpl5vacs.hd.mp4',
+    'https://cdn.flixel.com/flixel/jvw1avupguhfbo11betq.hd.mp4',
+    'https://cdn.flixel.com/flixel/8cmeusxf3pkanai43djs.hd.mp4',
+    'https://cdn.flixel.com/flixel/guwb10mfddctfvwioaex.hd.mp4',
+  ],
+  'partlycloudy': [
+    'https://cdn.flixel.com/flixel/13e0s6coh6ayapvdyqnv.hd.mp4',
+    'https://cdn.flixel.com/flixel/aorl3skmssy7udwopk22.hd.mp4',
+    'https://cdn.flixel.com/flixel/qed6wvf2igukiioykg3r.hd.mp4',
+    'https://cdn.flixel.com/flixel/3rd72eezaj6d23ahlo7y.hd.mp4',
+    'https://cdn.flixel.com/flixel/9m11gd43m6qn3y93ntzp.hd.mp4',
+    'https://cdn.flixel.com/flixel/hrkw2m8eofib9sk7t1v2.hd.mp4',
+  ],
+  'cloudy': [
+    'https://cdn.flixel.com/flixel/3rd72eezaj6d23ahlo7y.hd.mp4',
+    'https://cdn.flixel.com/flixel/e95h5cqyvhnrk4ytqt4q.hd.mp4',
+    'https://cdn.flixel.com/flixel/l2bjw34wnusyf5q2qq3p.hd.mp4',
+    'https://cdn.flixel.com/flixel/rrgta099ulami3zb9fd2.hd.mp4',
+  ],
+  'clear-night': [
+    'https://cdn.flixel.com/flixel/x9dr8caygivq5secll7i.hd.mp4',
+    'https://cdn.flixel.com/flixel/v26zyfd6yf0r33s46vpe.hd.mp4',
+    'https://cdn.flixel.com/flixel/ypy8bw9fgw1zv2b4htp2.hd.mp4',
+    'https://cdn.flixel.com/flixel/rosz2gi676xhkiw1ut6i.hd.mp4',
+  ],
+  'fog': [
+    'https://cdn.flixel.com/flixel/vwqzlk4turo2449be9uf.hd.mp4',
+    'https://cdn.flixel.com/flixel/5363uhabodwwrzgnq6vx.hd.mp4',
+  ],
+  'rainy': [
+    'https://cdn.flixel.com/flixel/qti3s5st0srowd9krhcw.hd.mp4',
+    'https://cdn.flixel.com/flixel/f0w23bd0enxur5ff0bxz.hd.mp4',
+  ],
+  'pouring': [
+    'https://cdn.flixel.com/flixel/qti3s5st0srowd9krhcw.hd.mp4',
+    'https://cdn.flixel.com/flixel/f0w23bd0enxur5ff0bxz.hd.mp4',
+  ],
+  'lightning-rainy': [
+    'https://cdn.flixel.com/flixel/sbk5sc03j7vay52r3e4o.hd.mp4',
+    'https://cdn.flixel.com/flixel/chrgj6raf5q3s6y2so7z.hd.mp4',
+  ],
+  'snowy': [
+    'https://cdn.flixel.com/flixel/on3ysblo5hzdmrhv1kwh.hd.mp4',
+    'https://cdn.flixel.com/flixel/ndza6yswd0k6vlboxyhk.hd.mp4',
+    'https://cdn.flixel.com/flixel/psi1hhbsshcus8eumtr7.hd.mp4',
+  ],
+  'snowy-rainy': [
+    'https://cdn.flixel.com/flixel/on3ysblo5hzdmrhv1kwh.hd.mp4',
+    'https://cdn.flixel.com/flixel/psi1hhbsshcus8eumtr7.hd.mp4',
+    'https://cdn.flixel.com/flixel/ndza6yswd0k6vlboxyhk.hd.mp4',
+  ],
+};
+
+const CLASSIC_DEFAULT = 'https://cdn.flixel.com/flixel/ypy8bw9fgw1zv2b4htp2.hd.mp4';
+
+// --- Preset registry ---
+
+const PRESETS = {
+  weather:    { gradients: WEATHER_GRADIENTS, nightGradients: WEATHER_NIGHT_GRADIENTS, particles: WEATHER_PARTICLE_MAP, speed: 30, label: 'Weather', icon: '\u2600\uFE0F' },
+  'night-sky':{ gradients: NIGHTSKY_GRADIENTS, nightGradients: null, particles: NIGHTSKY_PARTICLE_MAP, speed: 45, defaultParticle: 'stars', label: 'Night Sky', icon: '\uD83C\uDF0C' },
+  aurora:     { gradients: AURORA_GRADIENTS, nightGradients: null, particles: AURORA_PARTICLE_MAP, speed: 40, defaultParticle: 'stars', label: 'Aurora', icon: '\uD83C\uDF0C' },
+  ocean:      { gradients: OCEAN_GRADIENTS, nightGradients: null, particles: OCEAN_PARTICLE_MAP, speed: 35, label: 'Ocean', icon: '\uD83C\uDF0A' },
+  sunset:     { gradients: SUNSET_GRADIENTS, nightGradients: null, particles: SUNSET_PARTICLE_MAP, speed: 35, label: 'Sunset', icon: '\uD83C\uDF05' },
+  classic:    { videos: CLASSIC_VIDEOS, defaultUrl: CLASSIC_DEFAULT, label: 'Classic Videos', icon: '\uD83C\uDFAC' },
 };
 
 const WEATHER_EMOJIS = {
@@ -76,7 +245,7 @@ const WEATHER_EMOJIS = {
 };
 
 // ============================================================
-// CSS Keyframes (injected once into hui-root shadow)
+// CSS Keyframes — RELAXED timings (much slower than before)
 // ============================================================
 
 const AB_GLOBAL_STYLES = `
@@ -86,28 +255,28 @@ const AB_GLOBAL_STYLES = `
     100% { background-position: 50% 0%; }
   }
   @keyframes ab-rain-fall {
-    0%   { transform: translateY(-10vh); opacity: 0; }
-    10%  { opacity: 1; }
-    100% { transform: translateY(110vh); opacity: 0.3; }
+    0%   { transform: translateY(-10vh) translateX(0); opacity: 0; }
+    5%   { opacity: 0.6; }
+    100% { transform: translateY(110vh) translateX(-20px); opacity: 0.15; }
   }
   @keyframes ab-snow-fall {
     0%   { transform: translateY(-5vh) translateX(0) rotate(0deg); opacity: 0; }
-    10%  { opacity: 1; }
-    100% { transform: translateY(105vh) translateX(80px) rotate(360deg); opacity: 0; }
+    5%   { opacity: 0.8; }
+    100% { transform: translateY(105vh) translateX(60px) rotate(360deg); opacity: 0; }
   }
   @keyframes ab-twinkle {
-    0%, 100% { opacity: 0.1; transform: scale(0.8); }
-    50%      { opacity: 1; transform: scale(1.2); }
+    0%, 100% { opacity: 0.05; transform: scale(0.8); }
+    50%      { opacity: 0.9; transform: scale(1.15); }
   }
   @keyframes ab-hail-fall {
     0%   { transform: translateY(-5vh); opacity: 0; }
-    10%  { opacity: 0.9; }
-    100% { transform: translateY(105vh); opacity: 0.1; }
+    5%   { opacity: 0.8; }
+    100% { transform: translateY(105vh); opacity: 0.05; }
   }
 `;
 
 // ============================================================
-// Particle Generator (CSS-based, GPU-accelerated)
+// Particle Generator — MUCH slower, fewer particles, gentle
 // ============================================================
 
 function createParticles(type, container) {
@@ -117,45 +286,83 @@ function createParticles(type, container) {
   const frag = document.createDocumentFragment();
 
   switch (type) {
+    // Gentle rain — slow, sparse, dreamy
     case 'rain':
-      for (let i = 0; i < 80; i++) {
-        const d = document.createElement('div');
-        d.style.cssText = `position:absolute;left:${Math.random()*100}%;top:-5vh;width:2px;height:${15+Math.random()*25}px;background:linear-gradient(transparent,rgba(174,194,224,0.5));border-radius:0 0 2px 2px;animation:ab-rain-fall ${0.6+Math.random()*0.4}s linear ${Math.random()*2}s infinite;pointer-events:none;`;
-        frag.appendChild(d);
-      }
-      break;
-
-    case 'heavy-rain':
-      for (let i = 0; i < 150; i++) {
-        const d = document.createElement('div');
-        d.style.cssText = `position:absolute;left:${Math.random()*100}%;top:-5vh;width:2px;height:${20+Math.random()*30}px;background:linear-gradient(transparent,rgba(174,194,224,0.6));border-radius:0 0 2px 2px;animation:ab-rain-fall ${0.4+Math.random()*0.3}s linear ${Math.random()*1.5}s infinite;pointer-events:none;`;
-        frag.appendChild(d);
-      }
-      break;
-
-    case 'snow':
-      for (let i = 0; i < 50; i++) {
-        const sz = 4 + Math.random() * 8;
-        const d = document.createElement('div');
-        d.style.cssText = `position:absolute;left:${Math.random()*100}%;top:-5vh;width:${sz}px;height:${sz}px;background:white;border-radius:50%;opacity:${0.4+Math.random()*0.6};animation:ab-snow-fall ${4+Math.random()*6}s linear ${Math.random()*5}s infinite;pointer-events:none;`;
-        frag.appendChild(d);
-      }
-      break;
-
-    case 'stars':
-      for (let i = 0; i < 80; i++) {
-        const sz = 1 + Math.random() * 3;
-        const d = document.createElement('div');
-        d.style.cssText = `position:absolute;left:${Math.random()*100}%;top:${Math.random()*100}%;width:${sz}px;height:${sz}px;background:white;border-radius:50%;animation:ab-twinkle ${2+Math.random()*4}s ease-in-out ${Math.random()*5}s infinite;pointer-events:none;`;
-        frag.appendChild(d);
-      }
-      break;
-
-    case 'hail':
       for (let i = 0; i < 40; i++) {
-        const sz = 4 + Math.random() * 6;
         const d = document.createElement('div');
-        d.style.cssText = `position:absolute;left:${Math.random()*100}%;top:-3vh;width:${sz}px;height:${sz}px;background:rgba(255,255,255,0.8);border-radius:50%;animation:ab-hail-fall ${0.5+Math.random()*0.4}s linear ${Math.random()*2}s infinite;pointer-events:none;`;
+        d.style.cssText = `position:absolute;left:${Math.random()*100}%;top:-5vh;width:1.5px;height:${12+Math.random()*18}px;background:linear-gradient(transparent,rgba(174,194,224,0.35));border-radius:0 0 2px 2px;animation:ab-rain-fall ${2.5+Math.random()*2}s linear ${Math.random()*8}s infinite;pointer-events:none;will-change:transform;`;
+        frag.appendChild(d);
+      }
+      break;
+
+    // Heavy rain — still slower than before
+    case 'heavy-rain':
+      for (let i = 0; i < 80; i++) {
+        const d = document.createElement('div');
+        d.style.cssText = `position:absolute;left:${Math.random()*100}%;top:-5vh;width:1.5px;height:${15+Math.random()*22}px;background:linear-gradient(transparent,rgba(174,194,224,0.45));border-radius:0 0 2px 2px;animation:ab-rain-fall ${1.8+Math.random()*1.5}s linear ${Math.random()*5}s infinite;pointer-events:none;will-change:transform;`;
+        frag.appendChild(d);
+      }
+      break;
+
+    // Dreamy slow snow
+    case 'snow':
+      for (let i = 0; i < 30; i++) {
+        const sz = 3 + Math.random() * 7;
+        const d = document.createElement('div');
+        d.style.cssText = `position:absolute;left:${Math.random()*100}%;top:-5vh;width:${sz}px;height:${sz}px;background:white;border-radius:50%;opacity:${0.3+Math.random()*0.5};animation:ab-snow-fall ${8+Math.random()*12}s linear ${Math.random()*10}s infinite;pointer-events:none;will-change:transform;`;
+        frag.appendChild(d);
+      }
+      break;
+
+    // Slow twinkling stars — the main chill particle
+    case 'stars':
+      for (let i = 0; i < 60; i++) {
+        const sz = 1 + Math.random() * 2.5;
+        const d = document.createElement('div');
+        d.style.cssText = `position:absolute;left:${Math.random()*100}%;top:${Math.random()*100}%;width:${sz}px;height:${sz}px;background:white;border-radius:50%;animation:ab-twinkle ${5+Math.random()*10}s ease-in-out ${Math.random()*8}s infinite;pointer-events:none;will-change:opacity;`;
+        frag.appendChild(d);
+      }
+      break;
+
+    // Stars layered with gentle rain
+    case 'stars-rain':
+      // Stars layer
+      for (let i = 0; i < 40; i++) {
+        const sz = 1 + Math.random() * 2;
+        const d = document.createElement('div');
+        d.style.cssText = `position:absolute;left:${Math.random()*100}%;top:${Math.random()*100}%;width:${sz}px;height:${sz}px;background:white;border-radius:50%;animation:ab-twinkle ${5+Math.random()*10}s ease-in-out ${Math.random()*8}s infinite;pointer-events:none;will-change:opacity;`;
+        frag.appendChild(d);
+      }
+      // Rain layer
+      for (let i = 0; i < 30; i++) {
+        const d = document.createElement('div');
+        d.style.cssText = `position:absolute;left:${Math.random()*100}%;top:-5vh;width:1.5px;height:${12+Math.random()*18}px;background:linear-gradient(transparent,rgba(174,194,224,0.3));border-radius:0 0 2px 2px;animation:ab-rain-fall ${2.5+Math.random()*2}s linear ${Math.random()*8}s infinite;pointer-events:none;will-change:transform;`;
+        frag.appendChild(d);
+      }
+      break;
+
+    // Stars layered with gentle snow
+    case 'stars-snow':
+      for (let i = 0; i < 40; i++) {
+        const sz = 1 + Math.random() * 2;
+        const d = document.createElement('div');
+        d.style.cssText = `position:absolute;left:${Math.random()*100}%;top:${Math.random()*100}%;width:${sz}px;height:${sz}px;background:white;border-radius:50%;animation:ab-twinkle ${5+Math.random()*10}s ease-in-out ${Math.random()*8}s infinite;pointer-events:none;will-change:opacity;`;
+        frag.appendChild(d);
+      }
+      for (let i = 0; i < 20; i++) {
+        const sz = 3 + Math.random() * 6;
+        const d = document.createElement('div');
+        d.style.cssText = `position:absolute;left:${Math.random()*100}%;top:-5vh;width:${sz}px;height:${sz}px;background:white;border-radius:50%;opacity:${0.25+Math.random()*0.4};animation:ab-snow-fall ${10+Math.random()*12}s linear ${Math.random()*10}s infinite;pointer-events:none;will-change:transform;`;
+        frag.appendChild(d);
+      }
+      break;
+
+    // Hail
+    case 'hail':
+      for (let i = 0; i < 25; i++) {
+        const sz = 3 + Math.random() * 5;
+        const d = document.createElement('div');
+        d.style.cssText = `position:absolute;left:${Math.random()*100}%;top:-3vh;width:${sz}px;height:${sz}px;background:rgba(255,255,255,0.7);border-radius:50%;animation:ab-hail-fall ${1.5+Math.random()*1.5}s linear ${Math.random()*5}s infinite;pointer-events:none;will-change:transform;`;
         frag.appendChild(d);
       }
       break;
@@ -170,8 +377,8 @@ function createParticles(type, container) {
 
 function isVideoUrl(url) {
   if (!url || typeof url !== 'string') return false;
-  const clean = url.split('?')[0].split('#')[0].toLowerCase();
-  return clean.endsWith('.mp4') || clean.endsWith('.webm') || clean.endsWith('.ogg');
+  const c = url.split('?')[0].split('#')[0].toLowerCase();
+  return c.endsWith('.mp4') || c.endsWith('.webm') || c.endsWith('.ogg');
 }
 
 function getVideoType(url) {
@@ -230,13 +437,14 @@ class AnimatedBackground extends HTMLElement {
   setConfig(config) {
     if (!config) throw new Error('Invalid configuration');
     const oldEntity = this._config.entity;
+    const oldPreset = this._config.preset;
 
     this._config = {
       entity:              config.entity || '',
       preset:              config.preset || 'none',
       default_url:         config.default_url || '',
       state_url:           config.state_url || {},
-      transition_duration: config.transition_duration !== undefined ? config.transition_duration : 1.5,
+      transition_duration: config.transition_duration !== undefined ? config.transition_duration : 2,
       overlay:             config.overlay !== undefined ? config.overlay : 'rgba(0,0,0,0.15)',
       particles:           config.particles !== undefined ? config.particles : true,
       card_opacity:        config.card_opacity !== undefined ? config.card_opacity : 0.88,
@@ -247,7 +455,7 @@ class AnimatedBackground extends HTMLElement {
 
     this._renderCard();
 
-    if (this._connected && oldEntity !== this._config.entity) {
+    if (this._connected && (oldEntity !== this._config.entity || oldPreset !== this._config.preset)) {
       this._prevState = null;
       this._prevUrl = null;
       this._prevParticles = null;
@@ -264,8 +472,9 @@ class AnimatedBackground extends HTMLElement {
 
     this._hass = hass;
 
-    const changed = oldSt !== newSt;
-    const sunFlip = oldSun !== newSun && this._config.preset === 'weather';
+    const changed  = oldSt !== newSt;
+    const presetId = this._config.preset;
+    const sunFlip  = oldSun !== newSun && presetId && presetId !== 'none';
 
     if (this._connected && (changed || sunFlip)) {
       if (sunFlip) this._prevUrl = null;
@@ -283,7 +492,8 @@ class AnimatedBackground extends HTMLElement {
 
   _getEntity() {
     if (this._config.entity) return this._config.entity;
-    if (this._config.preset === 'weather' && this._hass)
+    const pr = this._config.preset;
+    if (pr && pr !== 'none' && this._hass)
       return Object.keys(this._hass.states).find(e => e.startsWith('weather.')) || null;
     return null;
   }
@@ -293,16 +503,29 @@ class AnimatedBackground extends HTMLElement {
     return sun ? sun.state === 'below_horizon' : false;
   }
 
-  _gradientFor(state) {
-    if (state === 'sunny' && this._isNight()) return WEATHER_GRADIENTS['clear-night'];
-    if (this._isNight() && NIGHT_GRADIENTS[state]) return NIGHT_GRADIENTS[state];
-    return WEATHER_GRADIENTS[state] || null;
+  _getPreset() {
+    return PRESETS[this._config.preset] || null;
   }
 
-  /* --- Find hui-root (robust: shadow chain + fallback) --- */
+  _gradientFor(state) {
+    const preset = this._getPreset();
+    if (!preset || !preset.gradients) return null;
+    // Night variants
+    if (state === 'sunny' && this._isNight() && preset.gradients['clear-night'])
+      return preset.gradients['clear-night'];
+    if (this._isNight() && preset.nightGradients?.[state])
+      return preset.nightGradients[state];
+    return preset.gradients[state] || null;
+  }
+
+  _getGradientSpeed() {
+    const preset = this._getPreset();
+    return (preset?.speed || 30) + 's';
+  }
+
+  /* --- Find hui-root --- */
 
   _findHuiRoot() {
-    // Walk up from card
     let el = this;
     for (let i = 0; i < 20; i++) {
       if (!el) break;
@@ -312,7 +535,6 @@ class AnimatedBackground extends HTMLElement {
       if (!el) break;
       if (el.localName === 'hui-root') return el;
     }
-    // Fallback — manual traversal
     try {
       const ha   = document.querySelector('home-assistant');
       const main = ha?.shadowRoot?.querySelector('home-assistant-main');
@@ -418,14 +640,12 @@ class AnimatedBackground extends HTMLElement {
       `);
     }
 
-    // Observer for dynamic view children
     if (this._viewObs) this._viewObs.disconnect();
     this._viewObs = new MutationObserver(() => {
       for (const c of view.children) if (c.style) c.style.background = 'transparent';
     });
     this._viewObs.observe(view, { childList: true });
 
-    // Short-term race-condition fix
     let n = 0;
     if (this._transTimer) clearInterval(this._transTimer);
     this._transTimer = setInterval(() => {
@@ -442,25 +662,33 @@ class AnimatedBackground extends HTMLElement {
     const entity  = this._getEntity();
     const state   = entity ? this._hass.states[entity]?.state : null;
     const night   = this._isNight();
+    const preset  = this._getPreset();
     let url       = null;
     let gradient  = null;
     let particles = null;
 
-    // 1. Custom state_url
+    // 1. Custom state_url always wins
     if (state && this._config.state_url?.[state]) {
       const v = this._config.state_url[state];
       if (v === 'none') { this._bgContainer.style.display = 'none'; return; }
       url = randomFrom(v);
     }
-    // 2. Weather preset
-    else if (this._config.preset === 'weather' && state) {
+    // 2. Preset: classic (video-based)
+    else if (preset?.videos && state) {
+      const vids = preset.videos[state];
+      if (vids) url = randomFrom(vids);
+      else if (preset.defaultUrl) url = preset.defaultUrl;
+    }
+    // 3. Preset: gradient-based
+    else if (preset?.gradients && state) {
       gradient = this._gradientFor(state);
       if (this._config.particles) {
-        particles = WEATHER_PARTICLE_MAP[state] || null;
-        if (night && !particles && state !== 'fog') particles = 'stars';
+        particles = preset.particles?.[state] || preset.defaultParticle || null;
+        if (night && !particles && state !== 'fog' && preset.gradients['clear-night'])
+          particles = 'stars';
       }
     }
-    // 3. default_url
+    // 4. default_url fallback
     else if (this._config.default_url) {
       url = randomFrom(this._config.default_url);
     }
@@ -481,7 +709,7 @@ class AnimatedBackground extends HTMLElement {
     }
     this._lightning(state);
 
-    if (this._config.debug) console.log('Animated Background:', { state, url, gradient, particles });
+    if (this._config.debug) console.log('Animated Background:', { state, url, gradient, particles, preset: this._config.preset });
   }
 
   _toUrl(url) {
@@ -520,7 +748,7 @@ class AnimatedBackground extends HTMLElement {
     next.innerHTML = '';
     next.style.background     = g;
     next.style.backgroundSize = '100% 200%';
-    next.style.animation      = 'ab-gradient-shift 12s ease infinite';
+    next.style.animation      = `ab-gradient-shift ${this._getGradientSpeed()} ease infinite`;
     requestAnimationFrame(() => {
       next.style.opacity = '1'; curr.style.opacity = '0';
       this._currentLayer = this._currentLayer === 'a' ? 'b' : 'a';
@@ -536,13 +764,13 @@ class AnimatedBackground extends HTMLElement {
     const flash = () => {
       if (!this._lightningOverlay) return;
       const lo = this._lightningOverlay;
-      lo.style.opacity = '0.7';
-      setTimeout(() => lo.style.opacity = '0', 100);
-      setTimeout(() => lo.style.opacity = '0.3', 200);
-      setTimeout(() => lo.style.opacity = '0', 300);
+      lo.style.opacity = '0.6';
+      setTimeout(() => lo.style.opacity = '0', 120);
+      setTimeout(() => lo.style.opacity = '0.25', 250);
+      setTimeout(() => lo.style.opacity = '0', 380);
     };
     flash();
-    this._flashTimer = setInterval(flash, 4000 + Math.random() * 6000);
+    this._flashTimer = setInterval(flash, 6000 + Math.random() * 12000);
   }
 
   /* --- Card Display --- */
@@ -557,7 +785,7 @@ class AnimatedBackground extends HTMLElement {
         :host{display:block}
         ha-card{overflow:hidden;background:rgba(var(--rgb-card-background-color,255,255,255),.6)!important;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
         .c{display:flex;align-items:center;padding:12px 16px;gap:12px}
-        .p{width:40px;height:40px;border-radius:10px;flex-shrink:0;background-size:100% 200%;animation:g 6s ease infinite;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+        .p{width:40px;height:40px;border-radius:10px;flex-shrink:0;background-size:100% 200%;animation:g 20s ease infinite;box-shadow:0 2px 8px rgba(0,0,0,.15)}
         @keyframes g{0%{background-position:50% 0%}50%{background-position:50% 100%}100%{background-position:50% 0%}}
         .i{display:flex;flex-direction:column;min-width:0}
         .t{font-size:12px;font-weight:500;opacity:.7;text-transform:uppercase;letter-spacing:.5px}
@@ -582,15 +810,22 @@ class AnimatedBackground extends HTMLElement {
 
     const entity = this._getEntity();
     const state  = entity && this._hass ? this._hass.states[entity]?.state : null;
+    const preset = this._getPreset();
+
     if (state) {
-      const em = WEATHER_EMOJIS[state] || '\uD83C\uDFAC';
-      sd.textContent = `${em} ${state.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}`;
+      const em = WEATHER_EMOJIS[state] || (preset?.icon || '\uD83C\uDFAC');
+      const label = state.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      const presetLabel = preset ? ` \u00B7 ${preset.label}` : '';
+      sd.textContent = `${em} ${label}${presetLabel}`;
       const g = this._gradientFor(state);
       if (g) { pv.style.background = g; pv.style.backgroundSize = '100% 200%'; }
+      else { pv.style.background = 'linear-gradient(135deg, #667eea, #764ba2)'; }
     } else if (this._config.default_url) {
       sd.textContent = '\uD83C\uDFAC Custom Background';
+      pv.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
     } else {
       sd.textContent = '\u23F8\uFE0F No entity configured';
+      pv.style.background = 'linear-gradient(135deg, #ccc, #999)';
     }
   }
 
@@ -629,7 +864,7 @@ class AnimatedBackgroundEditor extends HTMLElement {
   setConfig(config) {
     this._config = Object.assign({
       entity: '', preset: 'none', default_url: '', state_url: {},
-      transition_duration: 1.5, overlay: 'rgba(0,0,0,0.15)',
+      transition_duration: 2, overlay: 'rgba(0,0,0,0.15)',
       particles: true, card_opacity: 0.88, show_card: true,
       transparent_header: true, debug: false,
     }, config);
@@ -638,6 +873,19 @@ class AnimatedBackgroundEditor extends HTMLElement {
 
   _render() {
     const c = this._config;
+    const presetOptions = [
+      { value: 'none',      label: 'None (custom only)' },
+      { value: 'weather',   label: '\u2600\uFE0F Weather \u2014 Sky gradients + gentle particles' },
+      { value: 'night-sky', label: '\uD83C\uDF0C Night Sky \u2014 Deep space feel, always dark + stars' },
+      { value: 'aurora',    label: '\uD83C\uDF0C Aurora \u2014 Northern lights, teal + purple' },
+      { value: 'ocean',     label: '\uD83C\uDF0A Ocean \u2014 Calming water tones' },
+      { value: 'sunset',    label: '\uD83C\uDF05 Sunset \u2014 Warm amber, pink + earth tones' },
+      { value: 'classic',   label: '\uD83C\uDFAC Classic \u2014 Original cinemagraph videos' },
+    ];
+    const opts = presetOptions.map(p =>
+      `<option value="${p.value}"${c.preset===p.value?' selected':''}>${p.label}</option>`
+    ).join('');
+
     this.shadowRoot.innerHTML = `
       <style>
         .e{padding:16px}.r{margin-bottom:16px}
@@ -655,14 +903,24 @@ class AnimatedBackgroundEditor extends HTMLElement {
         .b{padding:6px 14px;border:1px solid var(--primary-color);border-radius:6px;background:transparent;color:var(--primary-color);cursor:pointer;font-size:13px}
         .b:hover{background:var(--primary-color);color:#fff}
         .x{padding:4px 8px;border:none;background:transparent;color:var(--error-color,#f44);cursor:pointer;font-size:18px;line-height:1}
+        .presets-info{background:var(--secondary-background-color,#f5f5f5);border-radius:8px;padding:10px 14px;margin-top:6px;font-size:12px;color:var(--secondary-text-color);line-height:1.5}
       </style>
       <div class="e">
         <div class="st">General</div>
         <div class="r"><label>Entity</label><ha-entity-picker allow-custom-entity></ha-entity-picker><div class="h">Weather entity recommended. Leave empty for auto-detection.</div></div>
-        <div class="r"><label>Preset</label><select id="ps"><option value="none"${c.preset==='none'?' selected':''}>None (custom only)</option><option value="weather"${c.preset==='weather'?' selected':''}>Weather (auto gradients + particles)</option></select><div class="h">Weather preset provides beautiful animated gradients &amp; particles for every weather state.</div></div>
+        <div class="r"><label>Preset</label><select id="ps">${opts}</select>
+          <div class="presets-info">
+            <b>Weather</b> \u2014 Relaxed sky gradients with gentle rain, snow, stars<br>
+            <b>Night Sky</b> \u2014 Always dark deep-space look, twinkling stars on every state<br>
+            <b>Aurora</b> \u2014 Northern lights teal/green/purple, dreamy<br>
+            <b>Ocean</b> \u2014 Calm water blues and teals<br>
+            <b>Sunset</b> \u2014 Warm amber, orange, pink earth tones<br>
+            <b>Classic</b> \u2014 Original cinemagraph videos from Flixel (uses internet)
+          </div>
+        </div>
         <div class="r"><label>Default Background URL</label><input type="text" id="du" value="${this._esc(c.default_url)}" placeholder="/local/videos/background.mp4"/><div class="h">Fallback video/image URL (.mp4, .webm, images).</div></div>
         <div class="st">Appearance</div>
-        <div class="r sl"><label>Transition</label><input type="range" id="td" min="0.3" max="5" step="0.1" value="${c.transition_duration}"/><span class="sv" id="tv">${c.transition_duration}s</span></div>
+        <div class="r sl"><label>Transition</label><input type="range" id="td" min="0.5" max="5" step="0.1" value="${c.transition_duration}"/><span class="sv" id="tv">${c.transition_duration}s</span></div>
         <div class="r sl"><label>Card Opacity</label><input type="range" id="co" min="0.3" max="1.0" step="0.02" value="${c.card_opacity}"/><span class="sv" id="ov">${Math.round(c.card_opacity*100)}%</span></div>
         <div class="r"><label>Overlay Color</label><input type="text" id="ol" value="${this._esc(c.overlay)}" placeholder="rgba(0,0,0,0.15)"/><div class="h">CSS color for readability overlay. 'none' to disable.</div></div>
         <div class="r tg"><label>Particle Effects</label><input type="checkbox" id="pa"${c.particles?' checked':''}></div>
@@ -671,7 +929,7 @@ class AnimatedBackgroundEditor extends HTMLElement {
         <div class="st">Custom State Backgrounds</div>
         <div id="su"></div>
         <button class="b" id="as">+ Add State</button>
-        <div class="h" style="margin-top:8px">Map entity states to custom video/image URLs. Overrides preset gradients.</div>
+        <div class="h" style="margin-top:8px">Map entity states to custom video/image URLs. Overrides preset for that state.</div>
       </div>`;
     this._bind();
   }
