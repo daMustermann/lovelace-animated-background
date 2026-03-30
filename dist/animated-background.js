@@ -7,18 +7,6 @@
 const CARD_VERSION = '2.2.0';
 const CARD_NAME = 'animated-background';
 const BG_CONTAINER_ID = 'ab-container';
-const AB_DB_NAME = 'animated-background-cache';
-const AB_DB_STORE = 'videos';
-const AB_DB_VERSION = 1;
-
-function _openABDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(AB_DB_NAME, AB_DB_VERSION);
-    req.onupgradeneeded = () => { req.result.createObjectStore(AB_DB_STORE); };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
 
 console.info(
   `%c ANIMATED BACKGROUND %c v${CARD_VERSION} %c by Maudersoft `,
@@ -236,31 +224,6 @@ const CLASSIC_VIDEOS = {
 };
 
 const CLASSIC_DEFAULT = 'https://cdn.flixel.com/flixel/ypy8bw9fgw1zv2b4htp2.hd.mp4';
-
-function _getAllClassicUrls() {
-  const urls = new Set();
-  for (const vids of Object.values(CLASSIC_VIDEOS)) {
-    for (const v of (Array.isArray(vids) ? vids : [vids])) urls.add(v);
-  }
-  urls.add(CLASSIC_DEFAULT);
-  return [...urls];
-}
-
-async function _getCachedUrl(url) {
-  try {
-    const db = await _openABDB();
-    return new Promise((resolve) => {
-      const tx = db.transaction(AB_DB_STORE, 'readonly');
-      const req = tx.objectStore(AB_DB_STORE).get(url);
-      req.onsuccess = () => {
-        db.close();
-        if (req.result) resolve(URL.createObjectURL(req.result));
-        else resolve(null);
-      };
-      req.onerror = () => { db.close(); resolve(null); };
-    });
-  } catch (_) { return null; }
-}
 
 // --- Preset registry ---
 
@@ -816,9 +779,7 @@ class AnimatedBackground extends HTMLElement {
       }
     };
 
-    _getCachedUrl(url).then(cached => {
-      loadMedia(cached || url, url);
-    });
+    loadMedia(url, url);
   }
 
   _toGradient(g) {
@@ -1015,7 +976,6 @@ class AnimatedBackgroundEditor extends HTMLElement {
     this._config = {};
     this._hass = null;
     this._rendered = false;
-    this._cacheProgress = null;
   }
 
   set hass(h) {
@@ -1076,20 +1036,6 @@ class AnimatedBackgroundEditor extends HTMLElement {
         .b:hover{background:var(--primary-color);color:#fff}
         .x{padding:4px 8px;border:none;background:transparent;color:var(--error-color,#f44);cursor:pointer;font-size:18px;line-height:1}
         .presets-info{background:var(--secondary-background-color,#f5f5f5);border-radius:8px;padding:10px 14px;margin-top:6px;font-size:12px;color:var(--secondary-text-color);line-height:1.5}
-        .cache-section{background:var(--secondary-background-color,#f5f5f5);border-radius:8px;padding:14px;margin-top:10px}
-        .cache-section .h{margin-top:6px}
-        .cache-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border:1px solid var(--primary-color);border-radius:8px;background:transparent;color:var(--primary-color);cursor:pointer;font-size:13px;font-weight:500;font-family:inherit;transition:background .2s,color .2s}
-        .cache-btn:hover{background:var(--primary-color);color:#fff}
-        .cache-btn:disabled{opacity:.5;cursor:not-allowed}
-        .cache-btn.del{border-color:var(--error-color,#f44);color:var(--error-color,#f44)}
-        .cache-btn.del:hover{background:var(--error-color,#f44);color:#fff}
-        .cache-progress{margin-top:8px;font-size:12px;color:var(--secondary-text-color)}
-        .cache-bar{width:100%;height:6px;border-radius:3px;background:var(--divider-color,#e0e0e0);margin-top:6px;overflow:hidden}
-        .cache-bar-fill{height:100%;border-radius:3px;background:var(--primary-color);transition:width .3s ease}
-        .cache-status{display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:12px;font-weight:500}
-        .cache-status .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-        .cache-status .dot.cached{background:#4caf50}
-        .cache-status .dot.not-cached{background:var(--divider-color,#ccc)}
         .dp-grid{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center;margin-top:8px}
         .dp-grid label{font-size:13px;font-weight:400;margin-bottom:0}
         .dp-grid select{padding:6px 8px;font-size:13px;border-radius:6px;border:1px solid var(--divider-color,#e0e0e0);background:var(--card-background-color,#fff);color:var(--primary-text-color);font-family:inherit}
@@ -1110,18 +1056,6 @@ class AnimatedBackgroundEditor extends HTMLElement {
             <b>Ocean</b> \u2014 Calm water blues and teals<br>
             <b>Sunset</b> \u2014 Warm amber, orange, pink earth tones<br>
             <b>Classic</b> \u2014 Original cinemagraph videos from Flixel (uses internet)
-          </div>
-          <div class="cache-section" id="cache-section" style="display:none">
-            <div class="cache-status" id="cache-status"><span class="dot not-cached"></span> Checking cache\u2026</div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <button class="cache-btn" id="cache-dl">\u2B07\uFE0F Download for Offline</button>
-              <button class="cache-btn del" id="cache-rm" style="display:none">\uD83D\uDDD1\uFE0F Clear Cache</button>
-            </div>
-            <div class="cache-progress" id="cache-prog" style="display:none">
-              <span id="cache-txt">Downloading\u2026</span>
-              <div class="cache-bar"><div class="cache-bar-fill" id="cache-fill" style="width:0%"></div></div>
-            </div>
-            <div class="h">Downloads all classic preset videos to your browser for offline use. Videos are stored locally \u2014 no internet required after download.</div>
           </div>
         </div>
         <div class="r"><label>Per-Device Presets</label>
@@ -1206,7 +1140,6 @@ class AnimatedBackgroundEditor extends HTMLElement {
       const dpd = sr.getElementById('dp-desktop'); if (dpd) dpd.value = c.device_presets?.desktop || '';
     }
     this._renderStates();
-    this._updateCacheSection();
   }
 
   _esc(s) { return (s || '').replace(/"/g, '&quot;'); }
@@ -1239,7 +1172,7 @@ class AnimatedBackgroundEditor extends HTMLElement {
       });
       epWrap.appendChild(pk);
     }
-    sr.getElementById('ps').addEventListener('change', e => { this._set('preset', e.target.value); this._updateCacheSection(); });
+    sr.getElementById('ps').addEventListener('change', e => { this._set('preset', e.target.value); });
     sr.getElementById('du').addEventListener('change', e => this._set('default_url', e.target.value));
     const td = sr.getElementById('td');
     td.addEventListener('input', e => { sr.getElementById('tv').textContent = e.target.value+'s'; this._set('transition_duration', parseFloat(e.target.value)); });
@@ -1280,186 +1213,8 @@ class AnimatedBackgroundEditor extends HTMLElement {
         this._set('device_presets', dp);
       });
     });
-    // Cache & states
-    sr.getElementById('cache-dl').addEventListener('click', () => this._downloadClassicVideos());
-    sr.getElementById('cache-rm').addEventListener('click', () => this._clearClassicCache());
     this._renderStates();
     sr.getElementById('as').addEventListener('click', () => { this._config.state_url = { ...this._config.state_url, '': '' }; this._renderStates(); });
-    this._updateCacheSection();
-  }
-
-  _updateCacheSection() {
-    const sr = this.shadowRoot;
-    const section = sr.getElementById('cache-section');
-    if (!section) return;
-    section.style.display = this._config.preset === 'classic' ? '' : 'none';
-    if (this._config.preset === 'classic') this._checkCacheStatus();
-  }
-
-  async _checkCacheStatus() {
-    const sr = this.shadowRoot;
-    const statusEl = sr.getElementById('cache-status');
-    const dlBtn = sr.getElementById('cache-dl');
-    const rmBtn = sr.getElementById('cache-rm');
-    if (!statusEl) return;
-
-    try {
-      const urls = _getAllClassicUrls();
-      const db = await _openABDB();
-      const keys = await new Promise((resolve, reject) => {
-        const tx = db.transaction(AB_DB_STORE, 'readonly');
-        const req = tx.objectStore(AB_DB_STORE).getAllKeys();
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
-      });
-      db.close();
-      const cached = urls.filter(u => keys.includes(u)).length;
-      const total = urls.length;
-      if (cached === 0) {
-        statusEl.innerHTML = '<span class="dot not-cached"></span> Not cached \u2014 videos stream from CDN';
-        dlBtn.style.display = ''; rmBtn.style.display = 'none';
-        dlBtn.textContent = '\u2B07\uFE0F Download All for Offline (' + total + ' videos)';
-        dlBtn.disabled = false;
-      } else if (cached < total) {
-        statusEl.innerHTML = '<span class="dot cached" style="background:#ff9800"></span> Partially cached (' + cached + '/' + total + ' videos)';
-        dlBtn.style.display = ''; rmBtn.style.display = '';
-        dlBtn.textContent = '\u2B07\uFE0F Download Remaining (' + (total - cached) + ' videos)';
-        dlBtn.disabled = false;
-      } else {
-        statusEl.innerHTML = '<span class="dot cached"></span> All ' + total + ' videos cached for offline use';
-        dlBtn.style.display = 'none'; rmBtn.style.display = '';
-      }
-    } catch (e) {
-      statusEl.innerHTML = '<span class="dot not-cached"></span> Browser storage not available';
-      dlBtn.disabled = true;
-    }
-  }
-
-  async _downloadClassicVideos() {
-    const sr = this.shadowRoot;
-    const dlBtn = sr.getElementById('cache-dl');
-    const progDiv = sr.getElementById('cache-prog');
-    const progTxt = sr.getElementById('cache-txt');
-    const progFill = sr.getElementById('cache-fill');
-
-    dlBtn.disabled = true;
-    progDiv.style.display = '';
-
-    const urls = _getAllClassicUrls();
-    const total = urls.length;
-
-    // Check if HA downloader service is available for server-side download
-    const hasDownloader = this._hass?.services?.downloader?.download_file;
-
-    try {
-      const db = await _openABDB();
-      let done = 0;
-      let failed = 0;
-      let attempted = 0;
-      let corsBlocked = false;
-
-      for (const url of urls) {
-        const exists = await new Promise((resolve) => {
-          const tx = db.transaction(AB_DB_STORE, 'readonly');
-          const req = tx.objectStore(AB_DB_STORE).get(url);
-          req.onsuccess = () => resolve(!!req.result);
-          req.onerror = () => resolve(false);
-        });
-        if (exists) { done++; continue; }
-
-        attempted++;
-        progTxt.textContent = 'Downloading ' + (done + 1) + ' of ' + total + '\u2026';
-        progFill.style.width = Math.round((done / total) * 100) + '%';
-        try {
-          const resp = await fetch(url);
-          if (!resp.ok) throw new Error('HTTP ' + resp.status);
-          const blob = await resp.blob();
-          await new Promise((resolve, reject) => {
-            const tx = db.transaction(AB_DB_STORE, 'readwrite');
-            tx.objectStore(AB_DB_STORE).put(blob, url);
-            tx.oncomplete = resolve;
-            tx.onerror = () => reject(tx.error);
-          });
-        } catch (err) {
-          console.warn('Animated Background: failed to cache', url, err);
-          failed++;
-          // If the first attempt fails with a network error, it's likely CORS — stop
-          if (attempted === 1 && err instanceof TypeError) {
-            corsBlocked = true;
-            break;
-          }
-        }
-        done++;
-        progFill.style.width = Math.round((done / total) * 100) + '%';
-      }
-
-      db.close();
-
-      if (corsBlocked && hasDownloader) {
-        // Use HA downloader service for server-side download
-        progTxt.textContent = 'Using HA Downloader service\u2026';
-        progFill.style.background = '';
-        let dlDone = 0;
-        let dlFailed = 0;
-        for (const url of urls) {
-          const filename = url.split('/').pop();
-          try {
-            await this._hass.callService('downloader', 'download_file', {
-              url: url,
-              subdir: 'animated-background',
-              filename: filename,
-              overwrite: false,
-            });
-          } catch (e) {
-            console.warn('Animated Background: downloader failed for', url, e);
-            dlFailed++;
-          }
-          dlDone++;
-          progFill.style.width = Math.round((dlDone / total) * 100) + '%';
-          progTxt.textContent = 'Server download ' + dlDone + ' of ' + total + '\u2026';
-        }
-        if (dlFailed === 0) {
-          progTxt.innerHTML = '\u2714\uFE0F Videos downloaded to HA server!<br>'
-            + '<small>Files saved to your HA Downloader directory under <code>animated-background/</code>.<br>'
-            + 'Move them to <code>/config/www/ab-videos/</code> and use <code>/local/ab-videos/</code> paths in <b>state_url</b>.</small>';
-        } else {
-          progTxt.innerHTML = 'Server download: ' + (total - dlFailed) + '/' + total + ' succeeded.<br>'
-            + '<small>Check your HA Downloader directory for the downloaded files.</small>';
-        }
-        progFill.style.width = '100%';
-      } else if (corsBlocked) {
-        progTxt.innerHTML = '\u26A0\uFE0F Download blocked by CDN (CORS policy).<br>'
-          + '<small>The Flixel video CDN does not allow browser-based downloads.<br>'
-          + 'Install the <b>Downloader</b> integration in HA to enable server-side downloads, '
-          + 'or manually download the videos to <code>/config/www/</code> via SSH '
-          + 'and use <code>/local/</code> paths in <b>state_url</b>.</small>';
-        progFill.style.width = '100%';
-        progFill.style.background = 'var(--error-color, #f44)';
-      } else if (failed > 0) {
-        progTxt.textContent = 'Cached ' + (attempted - failed) + ' of ' + attempted + ' new videos (' + failed + ' failed).';
-        progFill.style.width = '100%';
-        setTimeout(() => { progDiv.style.display = 'none'; }, 6000);
-      } else {
-        progTxt.textContent = 'Done! All ' + total + ' videos cached \u2714\uFE0F';
-        progFill.style.width = '100%';
-        setTimeout(() => { progDiv.style.display = 'none'; }, 4000);
-      }
-    } catch (e) {
-      progTxt.textContent = 'Error: ' + e.message;
-    }
-    dlBtn.disabled = false;
-    this._checkCacheStatus();
-  }
-
-  async _clearClassicCache() {
-    try {
-      const db = await _openABDB();
-      const tx = db.transaction(AB_DB_STORE, 'readwrite');
-      tx.objectStore(AB_DB_STORE).clear();
-      await new Promise((resolve) => { tx.oncomplete = resolve; });
-      db.close();
-    } catch (_) {}
-    this._checkCacheStatus();
   }
 
   _renderStates() {

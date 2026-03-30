@@ -159,18 +159,6 @@ preset: classic
 
 Includes videos for: sunny, partly cloudy, cloudy, clear night, fog, rainy, pouring, lightning, snowy, snowy-rainy.
 
-#### 📥 Offline Download
-
-By default the classic preset streams videos from the internet. You can **download all videos for offline use** directly from the card editor:
-
-1. Select the **Classic** preset in the visual editor
-2. A new **"Download for Offline"** section appears below the preset selector
-3. Click **"Download All for Offline"** — the card will cache all videos in your browser
-4. A progress bar shows download status
-5. Once cached, videos load instantly from the browser cache — no internet required
-
-You can also clear the cache at any time with the **"Clear Cache"** button. The cache status indicator shows whether videos are fully cached, partially cached, or not cached.
-
 ### Weather State Support
 
 All gradient-based presets support these weather states:
