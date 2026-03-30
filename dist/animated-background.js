@@ -441,6 +441,8 @@ class AnimatedBackground extends HTMLElement {
     this._isIdle = false;
     this._idleListeners = [];
     this._videoPaused = false;
+    this._cameraActive = false;
+    this._cameraRefreshTimer = null;
   }
 
   /* --- Lifecycle --- */
@@ -461,6 +463,8 @@ class AnimatedBackground extends HTMLElement {
       device_presets:      config.device_presets || {},
       default_url:         config.default_url || '',
       state_url:           config.state_url || {},
+      camera_entity:       config.camera_entity || '',
+      camera_overlay:      config.camera_overlay !== undefined ? config.camera_overlay : false,
       transition_duration: config.transition_duration !== undefined ? config.transition_duration : 2,
       overlay:             config.overlay !== undefined ? config.overlay : 'rgba(0,0,0,0.15)',
       particles:           config.particles !== undefined ? config.particles : true,
@@ -481,12 +485,14 @@ class AnimatedBackground extends HTMLElement {
 
     this._renderCard();
 
-    if (this._connected && (oldEntity !== this._config.entity || oldPreset !== this._config.preset)) {
+    const oldCamera = this._config._prevCamera;
+    if (this._connected && (oldEntity !== this._config.entity || oldPreset !== this._config.preset || this._config.camera_entity !== oldCamera)) {
       this._prevState = null;
       this._prevUrl = null;
       this._prevParticles = null;
       this._setupBackground();
     }
+    this._config._prevCamera = this._config.camera_entity;
     if (this._connected) {
       if (this._huiRoot) this._makeTransparent();
       this._applyBlur();
@@ -506,8 +512,10 @@ class AnimatedBackground extends HTMLElement {
     const changed  = oldSt !== newSt;
     const presetId = this._config.preset;
     const sunFlip  = oldSun !== newSun && presetId && presetId !== 'none';
+    const hasCamera = !!this._config.camera_entity;
+    const cameraInit = hasCamera && !this._cameraActive;
 
-    if (this._connected && (changed || sunFlip)) {
+    if (this._connected && (changed || sunFlip || cameraInit)) {
       if (sunFlip) this._prevUrl = null;
       this._updateBackground();
     }
@@ -665,18 +673,13 @@ class AnimatedBackground extends HTMLElement {
     inject('ab-trans', '#view>*{background:transparent!important;--lovelace-background:transparent!important}');
     inject('ab-opac',  `#view>*{opacity:${this._config.card_opacity}}`);
 
-    const glassCSS = 'background:rgba(var(--rgb-primary-color,3,169,244),.55)!important;backdrop-filter:blur(12px) saturate(1.4)!important;-webkit-backdrop-filter:blur(12px) saturate(1.4)!important';
-
     if (this._config.transparent_header) {
-      // CSS injection in hui-root shadow root for legacy selectors
       inject('ab-hdr', `
-        :host{--app-header-background-color:rgba(var(--rgb-primary-color,3,169,244),.55)!important}
-        .header{${glassCSS}}
+        :host{--app-header-background-color:transparent!important}
+        .header{background:transparent!important}
         .toolbar{background:transparent!important}
-        app-header{${glassCSS}}
+        app-header{background:transparent!important}
       `);
-
-      // Direct DOM: find and style all possible header elements (incl. shadow DOMs)
       this._applyHeaderTransparency(sr);
     } else {
       sr.getElementById('ab-hdr')?.remove();
@@ -698,64 +701,56 @@ class AnimatedBackground extends HTMLElement {
   }
 
   _applyHeaderTransparency(sr) {
-    const glassCSS = 'background:rgba(var(--rgb-primary-color,3,169,244),.55)!important;backdrop-filter:blur(12px) saturate(1.4)!important;-webkit-backdrop-filter:blur(12px) saturate(1.4)!important';
+    const clearCSS = 'background:transparent!important';
     const inject = (id, css, root) => { root.getElementById(id)?.remove(); const s = document.createElement('style'); s.id = id; s.textContent = css; root.appendChild(s); };
 
-    // Target ha-top-app-bar-fixed (modern HA 2024+) — has its own shadow root
+    // Target ha-top-app-bar-fixed (modern HA 2024+)
     const appBar = sr.querySelector('ha-top-app-bar-fixed') || sr.querySelector('ha-top-app-bar');
     if (appBar) {
-      // Style the outer element directly
-      appBar.style.setProperty('--mdc-top-app-bar-color', 'rgba(var(--rgb-primary-color,3,169,244),.55)');
+      appBar.style.setProperty('--mdc-top-app-bar-color', 'transparent');
       if (appBar.shadowRoot) {
         inject('ab-hdr-inner', `
-          :host{${glassCSS};--mdc-top-app-bar-color:transparent!important}
-          header,.mdc-top-app-bar{${glassCSS}}
-          .mdc-top-app-bar--fixed-scrolled{box-shadow:none!important}
+          :host{${clearCSS};--mdc-top-app-bar-color:transparent!important;--mdc-top-app-bar-fixed-box-shadow:none!important}
+          header,.mdc-top-app-bar,.mdc-top-app-bar--fixed-scrolled{${clearCSS};box-shadow:none!important}
         `, appBar.shadowRoot);
       }
     }
 
-    // Target app-header (older HA) — also has its own shadow root
+    // Target app-header (older HA)
     const appHeader = sr.querySelector('app-header');
     if (appHeader) {
       if (appHeader.shadowRoot) {
         inject('ab-hdr-inner', `
-          :host{${glassCSS}}
-          #contentContainer,#background{${glassCSS}}
+          :host{${clearCSS}}
+          #contentContainer,#background{${clearCSS}}
         `, appHeader.shadowRoot);
       }
-      // Also style the app-toolbar inside app-header
       const toolbar = appHeader.querySelector('app-toolbar');
-      if (toolbar) toolbar.style.cssText = glassCSS;
+      if (toolbar) toolbar.style.cssText = clearCSS;
     }
 
-    // Direct style on .header div (some HA versions)
+    // .header div fallback
     const headerDiv = sr.querySelector('.header');
     if (headerDiv && headerDiv !== appBar) {
-      headerDiv.style.cssText += ';' + glassCSS;
+      headerDiv.style.setProperty('background', 'transparent', 'important');
     }
   }
 
   _removeHeaderTransparency(sr) {
-    // Clean up ha-top-app-bar-fixed
     const appBar = sr.querySelector('ha-top-app-bar-fixed') || sr.querySelector('ha-top-app-bar');
     if (appBar) {
       appBar.style.removeProperty('--mdc-top-app-bar-color');
       appBar.shadowRoot?.getElementById('ab-hdr-inner')?.remove();
     }
-    // Clean up app-header
     const appHeader = sr.querySelector('app-header');
     if (appHeader) {
       appHeader.shadowRoot?.getElementById('ab-hdr-inner')?.remove();
       const toolbar = appHeader.querySelector('app-toolbar');
       if (toolbar) toolbar.style.cssText = '';
     }
-    // Clean up .header div
     const headerDiv = sr.querySelector('.header');
     if (headerDiv && headerDiv !== appBar) {
       headerDiv.style.removeProperty('background');
-      headerDiv.style.removeProperty('backdrop-filter');
-      headerDiv.style.removeProperty('-webkit-backdrop-filter');
     }
   }
 
@@ -774,6 +769,33 @@ class AnimatedBackground extends HTMLElement {
     let url       = null;
     let gradient  = null;
     let particles = null;
+
+    // 0. Camera entity as background (always takes priority when set)
+    if (this._config.camera_entity && this._hass?.states?.[this._config.camera_entity]) {
+      this._bgContainer.style.display = '';
+      if (!this._cameraActive) {
+        this._toCameraStream(this._config.camera_entity);
+        this._cameraActive = true;
+      }
+      // Overlay weather particles on camera if enabled
+      if (this._config.camera_overlay && this._config.particles) {
+        const weatherEntity = this._getEntity();
+        const weatherState = weatherEntity ? this._hass.states[weatherEntity]?.state : null;
+        if (weatherState) {
+          const pMap = PRESETS.weather?.particles || {};
+          particles = pMap[weatherState] || null;
+          if (night && !particles && weatherState !== 'fog') particles = 'stars';
+        }
+      }
+      if (particles !== this._prevParticles) {
+        this._prevParticles = particles;
+        createParticles(particles, this._particleContainer);
+      }
+      if (this._config.camera_overlay) this._lightning(this._hass.states[this._getEntity()]?.state);
+      this._updateCardDisplay();
+      return;
+    }
+    this._cameraActive = false;
 
     // 1. Custom state_url always wins
     if (state && this._config.state_url?.[state]) {
@@ -894,6 +916,55 @@ class AnimatedBackground extends HTMLElement {
     };
 
     loadMedia(url, url);
+  }
+
+  _toCameraStream(cameraEntity) {
+    const next = this._currentLayer === 'a' ? this._layerB : this._layerA;
+    const curr = this._currentLayer === 'a' ? this._layerA : this._layerB;
+    next.innerHTML = '';
+    next.style.background = ''; next.style.backgroundSize = ''; next.style.animation = '';
+
+    // Use HA camera proxy for MJPEG stream (universally supported)
+    const img = document.createElement('img');
+    const entityId = cameraEntity.replace(/\./g, '.');
+    // HA provides a proxy endpoint for camera entity images
+    // Use the access_token for authentication
+    const stateObj = this._hass?.states?.[cameraEntity];
+    const accessToken = stateObj?.attributes?.access_token;
+    if (accessToken) {
+      img.src = `/api/camera_proxy_stream/${entityId}?token=${accessToken}`;
+    } else {
+      img.src = `/api/camera_proxy/${entityId}`;
+    }
+    img.alt = '';
+    img.style.cssText = 'min-width:100%;min-height:100%;width:auto;height:auto;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);object-fit:cover';
+    next.appendChild(img);
+
+    // Swap layers on load (or timeout fallback)
+    const swap = () => {
+      next.style.opacity = '1'; curr.style.opacity = '0';
+      this._currentLayer = this._currentLayer === 'a' ? 'b' : 'a';
+    };
+    img.addEventListener('load', swap, { once: true });
+    // MJPEG streams may not fire 'load', so swap after a short timeout
+    setTimeout(swap, 1500);
+
+    // Refresh the camera image periodically for non-MJPEG cameras
+    if (this._cameraRefreshTimer) clearInterval(this._cameraRefreshTimer);
+    this._cameraRefreshTimer = setInterval(() => {
+      if (!this._cameraActive || !this._connected) {
+        clearInterval(this._cameraRefreshTimer);
+        this._cameraRefreshTimer = null;
+        return;
+      }
+      const s = this._hass?.states?.[cameraEntity];
+      const token = s?.attributes?.access_token;
+      const layer = this._currentLayer === 'a' ? this._layerA : this._layerB;
+      const curImg = layer.querySelector('img');
+      if (curImg && token) {
+        curImg.src = `/api/camera_proxy/${entityId}?token=${token}&_t=${Date.now()}`;
+      }
+    }, 2000);
   }
 
   _toGradient(g) {
@@ -1078,7 +1149,13 @@ class AnimatedBackground extends HTMLElement {
       pauseBtn.classList.toggle('active', this._videoPaused);
     }
 
-    if (state) {
+    // Camera entity display
+    if (this._cameraActive && this._config.camera_entity) {
+      const camState = this._hass?.states?.[this._config.camera_entity];
+      const camName = camState?.attributes?.friendly_name || this._config.camera_entity;
+      const overlayLabel = this._config.camera_overlay && state ? ` \u00B7 ${state}` : '';
+      sd.textContent = `\uD83D\uDCF7 ${camName}${overlayLabel}`;
+    } else if (state) {
       const em = WEATHER_EMOJIS[state] || (preset?.icon || '\uD83C\uDFAC');
       const label = state.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
       const presetLabel = preset ? ` \u00B7 ${preset.label}` : '';
@@ -1095,6 +1172,8 @@ class AnimatedBackground extends HTMLElement {
 
   _cleanup() {
     this._teardownIdleWatcher();
+    if (this._cameraRefreshTimer) { clearInterval(this._cameraRefreshTimer); this._cameraRefreshTimer = null; }
+    this._cameraActive = false;
     const sr = this._huiRoot?.shadowRoot;
     if (sr) {
       ['ab-container','ab-mstyles','ab-gstyles','ab-trans','ab-opac','ab-hdr','ab-idle-dim'].forEach(id => sr.getElementById(id)?.remove());
@@ -1124,13 +1203,13 @@ class AnimatedBackgroundEditor extends HTMLElement {
 
   set hass(h) {
     this._hass = h;
-    const p = this.shadowRoot?.querySelector('ha-entity-picker');
-    if (p) { p.hass = h; }
+    this.shadowRoot?.querySelectorAll('ha-entity-picker').forEach(p => { p.hass = h; });
   }
 
   setConfig(config) {
     this._config = Object.assign({
       entity: '', preset: 'none', device_presets: {}, default_url: '', state_url: {},
+      camera_entity: '', camera_overlay: false,
       transition_duration: 2, overlay: 'rgba(0,0,0,0.15)',
       particles: true, static_gradient: false,
       card_opacity: 0.88, show_card: true,
@@ -1214,6 +1293,10 @@ class AnimatedBackgroundEditor extends HTMLElement {
           </div>
         </div>
         <div class="r"><label>Default Background URL</label><input type="text" id="du" value="${this._esc(c.default_url)}" placeholder="/local/videos/background.mp4"/><div class="h">Fallback video/image URL (.mp4, .webm, images).</div></div>
+        <div class="st">\uD83D\uDCF7 Camera Background</div>
+        <div class="r"><label>Camera Entity</label><div id="cam-wrap"></div><div class="h">Use a camera entity as live background. Overrides preset when set. Works great with blur.</div></div>
+        <div class="r tg"><label>Weather Overlay on Camera</label><input type="checkbox" id="co-ov"${c.camera_overlay?' checked':''}></div>
+        <div class="h" style="margin-top:-12px;margin-bottom:12px">Show rain, snow, stars, lightning etc. on top of the camera stream based on current weather.</div>
         <div class="st">Appearance</div>
         <div class="r sl"><label>Transition</label><input type="range" id="td" min="0.5" max="5" step="0.1" value="${c.transition_duration}"/><span class="sv" id="tv">${c.transition_duration}s</span></div>
         <div class="r sl"><label>Card Opacity</label><input type="range" id="co" min="0.3" max="1.0" step="0.02" value="${c.card_opacity}"/><span class="sv" id="ov">${Math.round(c.card_opacity*100)}%</span></div>
@@ -1273,6 +1356,10 @@ class AnimatedBackgroundEditor extends HTMLElement {
     if (ibs) { ibs.value = c.idle_blur_strength || 8; sr.getElementById('ibsv').textContent = (c.idle_blur_strength || 8) + 'px'; }
     const idm = sr.getElementById('idm');
     if (idm) { idm.value = c.idle_dim || 0.3; sr.getElementById('idmv').textContent = Math.round((c.idle_dim || 0.3) * 100) + '%'; }
+    // Camera
+    const camPk = sr.querySelector('#cam-wrap ha-entity-picker');
+    if (camPk && camPk.value !== (c.camera_entity || '')) camPk.value = c.camera_entity || '';
+    sr.getElementById('co-ov').checked = !!c.camera_overlay;
     // Device presets
     const dpEn = sr.getElementById('dp-en');
     const hasDP = Object.keys(c.device_presets || {}).length > 0;
@@ -1318,6 +1405,21 @@ class AnimatedBackgroundEditor extends HTMLElement {
     }
     sr.getElementById('ps').addEventListener('change', e => { this._set('preset', e.target.value); });
     sr.getElementById('du').addEventListener('change', e => this._set('default_url', e.target.value));
+    // Camera entity picker
+    const camWrap = sr.getElementById('cam-wrap');
+    if (camWrap) {
+      const camPk = document.createElement('ha-entity-picker');
+      camPk.allowCustomEntity = true;
+      camPk.includeDomains = ['camera'];
+      camPk.hass = this._hass;
+      camPk.value = this._config.camera_entity || '';
+      camPk.addEventListener('value-changed', e => {
+        e.stopPropagation();
+        this._set('camera_entity', e.detail.value || '');
+      });
+      camWrap.appendChild(camPk);
+    }
+    sr.getElementById('co-ov').addEventListener('change', e => this._set('camera_overlay', e.target.checked));
     const td = sr.getElementById('td');
     td.addEventListener('input', e => { sr.getElementById('tv').textContent = e.target.value+'s'; this._set('transition_duration', parseFloat(e.target.value)); });
     const co = sr.getElementById('co');
