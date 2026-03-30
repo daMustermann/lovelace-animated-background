@@ -2,7 +2,7 @@
 
 > by **Maudersoft** — forked & rebuilt from the original by Villhellm & TRusselo
 
-Beautiful, dynamic animated backgrounds for your Home Assistant dashboards. Works out of the box with weather entities — or bring your own videos and images.
+Beautiful, dynamic animated backgrounds for your Home Assistant dashboards. Works out of the box with weather entities — or bring your own videos, images, and camera streams.
 
 **v2.2.0** — Complete rebuild for modern Home Assistant (2024–2026+).
 
@@ -13,21 +13,25 @@ Beautiful, dynamic animated backgrounds for your Home Assistant dashboards. Work
 ## ✨ Features
 
 - **6 Built-in Presets** — Weather, Night Sky, Aurora, Ocean, Sunset, Classic Videos
+- **📷 Camera Background** — Use any HA camera entity as a live animated background
+- **Weather Overlay on Camera** — Rain, snow, stars, lightning effects on top of your camera stream
 - **Relaxed Animations** — Slow, gentle particles and gradient shifts — designed for all-day use
 - **Day/Night Aware** — Automatically adjusts colors based on `sun.sun` entity
 - **Particle Effects** — Rain, snow, twinkling stars, hail (GPU-accelerated CSS)
 - **Lightning Flashes** — Realistic random flashes during thunderstorms
 - **Smooth Crossfade** — Seamless transitions when weather/state changes
 - **Video & Image Support** — Use .mp4, .webm, or any image as background
+- **Video Controls** — Pause auto-switch and skip to next video for video-based presets
 - **Classic Cinemagraph Videos** — Original Flixel video collection as a one-click preset
 - **Visual Editor** — Configure everything through the HA card editor UI
-- **Transparent Header** — Frosted-glass effect on the toolbar
+- **Transparent Header** — Fully transparent toolbar, blends with the background
 - **Adjustable Card Opacity** — Control how translucent your dashboard cards appear
 - **Per-Device Presets** — Different presets for mobile, tablet, and desktop
 - **Background Blur** — Configurable constant blur effect
 - **Idle Screensaver** — Auto blur & dim after inactivity, restores on touch/mouse
 - **Static Gradient Mode** — Keep gradient fixed while particles still animate
 - **Per-View Backgrounds** — Add the card to any view for view-specific backgrounds
+- **Compact Status Card** — Small status indicator with live controls
 - **HACS Compatible** — Install as custom repository
 
 ---
@@ -91,13 +95,15 @@ preset: weather            # weather / night-sky / aurora / ocean / sunset / cla
 | `device_presets` | map | `{}` | Override preset per device type. Keys: `mobile`, `tablet`, `desktop`. |
 | `default_url` | string/list | `''` | Fallback background URL. Supports `.mp4`, `.webm`, images. Use a list for random selection. |
 | `state_url` | map | `{}` | Map of entity states to background URLs. Overrides preset gradients. |
-| `transition_duration` | number | `1.5` | Crossfade duration in seconds (0.3–5). |
+| `camera_entity` | string | `''` | Camera entity to use as live background. Overrides preset when set. |
+| `camera_overlay` | boolean | `false` | Show weather particles (rain, snow, stars, lightning) on top of the camera stream. |
+| `transition_duration` | number | `2` | Crossfade duration in seconds (0.5–5). |
 | `overlay` | string | `rgba(0,0,0,0.15)` | CSS color for readability overlay. Set to `none` to disable. |
 | `particles` | boolean | `true` | Enable weather-appropriate particle effects (rain, snow, stars, hail). |
 | `static_gradient` | boolean | `false` | Keep gradient background static (no animation) while particles still move. |
 | `card_opacity` | number | `0.88` | Opacity of dashboard cards (0.3–1.0). Lower = more background visible. |
-| `show_card` | boolean | `true` | Show the small status indicator card. Set `false` to hide. |
-| `transparent_header` | boolean | `true` | Make the toolbar translucent with frosted-glass effect. |
+| `show_card` | boolean | `true` | Show the compact status indicator card. Set `false` to hide. |
+| `transparent_header` | boolean | `true` | Make the toolbar fully transparent, blending with the background. |
 | `blur` | number | `0` | Constant background blur in pixels (0–30). |
 | `idle_blur` | boolean | `false` | Enable idle screensaver (blur + dim after inactivity). |
 | `idle_timeout` | number | `60` | Seconds of inactivity before screensaver activates (5–300). |
@@ -183,6 +189,50 @@ All gradient-based presets support these weather states:
 | ⚠️ Exceptional | — |
 
 All animations are deliberately slow and relaxed — designed to run all day without being distracting.
+
+---
+
+## 📷 Camera Background
+
+Use any Home Assistant camera entity as a live animated background. The camera stream is displayed full-screen behind your dashboard cards.
+
+```yaml
+type: custom:animated-background
+camera_entity: camera.front_door
+blur: 3                 # Optional: slight blur for a softer look
+transparent_header: true
+```
+
+### Weather Overlay on Camera
+
+Combine a live camera feed with weather-reactive particle effects. When enabled, rain, snow, stars, and lightning flash on top of the camera stream based on the current weather state:
+
+```yaml
+type: custom:animated-background
+camera_entity: camera.garden
+entity: weather.home        # Weather entity for overlay effects
+camera_overlay: true
+particles: true
+```
+
+This creates a beautiful effect — your security camera overlaid with animated weather effects like raindrops or snowflakes.
+
+**Tips:**
+- Camera background takes priority over presets — if `camera_entity` is set, the preset is ignored
+- Works with any HA camera entity (MJPEG, snapshot-based, etc.)
+- Combine with `blur` for a soft ambient look, great for wall-mounted tablets
+- The status card shows 📷 and the camera's friendly name when a camera is active
+
+---
+
+## � Video Controls
+
+When using a video-based preset (like Classic) or state URLs with multiple videos, a compact control bar appears on the status card:
+
+- **⏸ Pause** — Locks the current video, preventing automatic changes on state updates. Press again (▶) to resume.
+- **⏭ Next** — Skip to a random different video from the current state's video pool.
+
+Controls only appear when there are multiple videos available for the current state.
 
 ---
 
@@ -374,6 +424,9 @@ state_url:
 | Background flickers on view change | This is normal — the card disconnects/reconnects. Increase `transition_duration`. |
 | Resource not found (404) | Ensure the resource URL is correct: `/local/animated-background.js` for manual install, or `/hacsfiles/lovelace-animated-background/animated-background.js` for HACS. |
 | Editor not showing | Clear browser cache (Ctrl+Shift+R). Ensure the resource type is "JavaScript Module". |
+| Entity picker not appearing in editor | This can happen if HA form elements haven't loaded yet. Close and re-open the editor, or reload the page. |
+| Camera background not loading | Check that the camera entity exists and is active. View browser console for errors. |
+| Header still colored when transparent | Some HA themes override header colors. Try disabling theme-specific header settings. |
 
 ---
 
