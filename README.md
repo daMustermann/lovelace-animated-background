@@ -36,6 +36,8 @@ Beautiful, dynamic animated backgrounds for your Home Assistant dashboards. Work
 
 ### 1. Install via HACS (Custom Repository)
 
+[![Open HACS Repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=daMustermann&repository=lovelace-animated-background&category=dashboard)
+
 This card is not in the default HACS store — add it as a **custom repository**:
 
 1. Open **HACS** in your Home Assistant sidebar
@@ -48,7 +50,7 @@ This card is not in the default HACS store — add it as a **custom repository**
 5. Click **Add** → find **"Animated Background"** in HACS → **Download**
 6. **Restart Home Assistant** (or reload resources)
 
-[![Open HACS Repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=daMustermann&repository=lovelace-animated-background&category=dashboard)
+
 
 ### Manual Install
 

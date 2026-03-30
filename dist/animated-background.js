@@ -1199,10 +1199,24 @@ class AnimatedBackgroundEditor extends HTMLElement {
     this._config = {};
     this._hass = null;
     this._rendered = false;
+    this._pickersReady = false;
+    this._ensureHaElements();
+  }
+
+  async _ensureHaElements() {
+    if (customElements.get('ha-entity-picker')) return;
+    try {
+      const ch = await window.loadCardHelpers?.();
+      if (ch) {
+        const c = await ch.createCardElement({ type: 'entities', entities: [] });
+        await c?.constructor?.getConfigElement?.();
+      }
+    } catch (_) { /* ignore */ }
   }
 
   set hass(h) {
     this._hass = h;
+    if (this._rendered && !this._pickersReady) this._createPickers();
     this.shadowRoot?.querySelectorAll('ha-entity-picker').forEach(p => { p.hass = h; });
   }
 
@@ -1389,10 +1403,11 @@ class AnimatedBackgroundEditor extends HTMLElement {
     return options.map(o => `<option value="${o.value}"${selected===o.value?' selected':''}>${o.label}</option>`).join('');
   }
 
-  _bind() {
+  _createPickers() {
+    if (this._pickersReady) return;
     const sr = this.shadowRoot;
     const epWrap = sr.getElementById('ep-wrap');
-    if (epWrap) {
+    if (epWrap && !epWrap.querySelector('ha-entity-picker')) {
       const pk = document.createElement('ha-entity-picker');
       pk.allowCustomEntity = true;
       pk.hass = this._hass;
@@ -1403,11 +1418,8 @@ class AnimatedBackgroundEditor extends HTMLElement {
       });
       epWrap.appendChild(pk);
     }
-    sr.getElementById('ps').addEventListener('change', e => { this._set('preset', e.target.value); });
-    sr.getElementById('du').addEventListener('change', e => this._set('default_url', e.target.value));
-    // Camera entity picker
     const camWrap = sr.getElementById('cam-wrap');
-    if (camWrap) {
+    if (camWrap && !camWrap.querySelector('ha-entity-picker')) {
       const camPk = document.createElement('ha-entity-picker');
       camPk.allowCustomEntity = true;
       camPk.includeDomains = ['camera'];
@@ -1419,6 +1431,14 @@ class AnimatedBackgroundEditor extends HTMLElement {
       });
       camWrap.appendChild(camPk);
     }
+    if (this._hass) this._pickersReady = true;
+  }
+
+  _bind() {
+    const sr = this.shadowRoot;
+    this._createPickers();
+    sr.getElementById('ps').addEventListener('change', e => { this._set('preset', e.target.value); });
+    sr.getElementById('du').addEventListener('change', e => this._set('default_url', e.target.value));
     sr.getElementById('co-ov').addEventListener('change', e => this._set('camera_overlay', e.target.checked));
     const td = sr.getElementById('td');
     td.addEventListener('input', e => { sr.getElementById('tv').textContent = e.target.value+'s'; this._set('transition_duration', parseFloat(e.target.value)); });
