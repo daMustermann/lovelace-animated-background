@@ -487,6 +487,7 @@ class AnimatedBackground extends HTMLElement {
       this._setupBackground();
     }
     if (this._connected) {
+      if (this._huiRoot) this._makeTransparent();
       this._applyBlur();
       this._setupIdleWatcher();
     }
@@ -666,8 +667,12 @@ class AnimatedBackground extends HTMLElement {
     if (this._config.transparent_header) {
       inject('ab-hdr', `
         :host{--app-header-background-color:rgba(var(--rgb-primary-color,3,169,244),.55)!important}
-        .header,.toolbar,app-header{backdrop-filter:blur(12px) saturate(1.4);-webkit-backdrop-filter:blur(12px) saturate(1.4)}
+        .header{background:rgba(var(--rgb-primary-color,3,169,244),.55)!important;backdrop-filter:blur(12px) saturate(1.4);-webkit-backdrop-filter:blur(12px) saturate(1.4)}
+        .toolbar{background:transparent!important}
+        app-header{--app-header-background-color:rgba(var(--rgb-primary-color,3,169,244),.55)!important;backdrop-filter:blur(12px) saturate(1.4);-webkit-backdrop-filter:blur(12px) saturate(1.4)}
       `);
+    } else {
+      sr.getElementById('ab-hdr')?.remove();
     }
 
     if (this._viewObs) this._viewObs.disconnect();
