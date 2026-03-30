@@ -440,6 +440,7 @@ class AnimatedBackground extends HTMLElement {
     this._idleTimer = null;
     this._isIdle = false;
     this._idleListeners = [];
+    this._videoPaused = false;
   }
 
   /* --- Lifecycle --- */
@@ -659,20 +660,27 @@ class AnimatedBackground extends HTMLElement {
     const view = sr.getElementById('view');
     if (!view) return;
 
-    const inject = (id, css) => { sr.getElementById(id)?.remove(); const s = document.createElement('style'); s.id = id; s.textContent = css; sr.appendChild(s); };
+    const inject = (id, css, root) => { const r = root || sr; r.getElementById(id)?.remove(); const s = document.createElement('style'); s.id = id; s.textContent = css; r.appendChild(s); };
 
     inject('ab-trans', '#view>*{background:transparent!important;--lovelace-background:transparent!important}');
     inject('ab-opac',  `#view>*{opacity:${this._config.card_opacity}}`);
 
+    const glassCSS = 'background:rgba(var(--rgb-primary-color,3,169,244),.55)!important;backdrop-filter:blur(12px) saturate(1.4)!important;-webkit-backdrop-filter:blur(12px) saturate(1.4)!important';
+
     if (this._config.transparent_header) {
+      // CSS injection in hui-root shadow root for legacy selectors
       inject('ab-hdr', `
         :host{--app-header-background-color:rgba(var(--rgb-primary-color,3,169,244),.55)!important}
-        .header{background:rgba(var(--rgb-primary-color,3,169,244),.55)!important;backdrop-filter:blur(12px) saturate(1.4);-webkit-backdrop-filter:blur(12px) saturate(1.4)}
+        .header{${glassCSS}}
         .toolbar{background:transparent!important}
-        app-header{--app-header-background-color:rgba(var(--rgb-primary-color,3,169,244),.55)!important;backdrop-filter:blur(12px) saturate(1.4);-webkit-backdrop-filter:blur(12px) saturate(1.4)}
+        app-header{${glassCSS}}
       `);
+
+      // Direct DOM: find and style all possible header elements (incl. shadow DOMs)
+      this._applyHeaderTransparency(sr);
     } else {
       sr.getElementById('ab-hdr')?.remove();
+      this._removeHeaderTransparency(sr);
     }
 
     if (this._viewObs) this._viewObs.disconnect();
@@ -689,10 +697,75 @@ class AnimatedBackground extends HTMLElement {
     }, 100);
   }
 
+  _applyHeaderTransparency(sr) {
+    const glassCSS = 'background:rgba(var(--rgb-primary-color,3,169,244),.55)!important;backdrop-filter:blur(12px) saturate(1.4)!important;-webkit-backdrop-filter:blur(12px) saturate(1.4)!important';
+    const inject = (id, css, root) => { root.getElementById(id)?.remove(); const s = document.createElement('style'); s.id = id; s.textContent = css; root.appendChild(s); };
+
+    // Target ha-top-app-bar-fixed (modern HA 2024+) — has its own shadow root
+    const appBar = sr.querySelector('ha-top-app-bar-fixed') || sr.querySelector('ha-top-app-bar');
+    if (appBar) {
+      // Style the outer element directly
+      appBar.style.setProperty('--mdc-top-app-bar-color', 'rgba(var(--rgb-primary-color,3,169,244),.55)');
+      if (appBar.shadowRoot) {
+        inject('ab-hdr-inner', `
+          :host{${glassCSS};--mdc-top-app-bar-color:transparent!important}
+          header,.mdc-top-app-bar{${glassCSS}}
+          .mdc-top-app-bar--fixed-scrolled{box-shadow:none!important}
+        `, appBar.shadowRoot);
+      }
+    }
+
+    // Target app-header (older HA) — also has its own shadow root
+    const appHeader = sr.querySelector('app-header');
+    if (appHeader) {
+      if (appHeader.shadowRoot) {
+        inject('ab-hdr-inner', `
+          :host{${glassCSS}}
+          #contentContainer,#background{${glassCSS}}
+        `, appHeader.shadowRoot);
+      }
+      // Also style the app-toolbar inside app-header
+      const toolbar = appHeader.querySelector('app-toolbar');
+      if (toolbar) toolbar.style.cssText = glassCSS;
+    }
+
+    // Direct style on .header div (some HA versions)
+    const headerDiv = sr.querySelector('.header');
+    if (headerDiv && headerDiv !== appBar) {
+      headerDiv.style.cssText += ';' + glassCSS;
+    }
+  }
+
+  _removeHeaderTransparency(sr) {
+    // Clean up ha-top-app-bar-fixed
+    const appBar = sr.querySelector('ha-top-app-bar-fixed') || sr.querySelector('ha-top-app-bar');
+    if (appBar) {
+      appBar.style.removeProperty('--mdc-top-app-bar-color');
+      appBar.shadowRoot?.getElementById('ab-hdr-inner')?.remove();
+    }
+    // Clean up app-header
+    const appHeader = sr.querySelector('app-header');
+    if (appHeader) {
+      appHeader.shadowRoot?.getElementById('ab-hdr-inner')?.remove();
+      const toolbar = appHeader.querySelector('app-toolbar');
+      if (toolbar) toolbar.style.cssText = '';
+    }
+    // Clean up .header div
+    const headerDiv = sr.querySelector('.header');
+    if (headerDiv && headerDiv !== appBar) {
+      headerDiv.style.removeProperty('background');
+      headerDiv.style.removeProperty('backdrop-filter');
+      headerDiv.style.removeProperty('-webkit-backdrop-filter');
+    }
+  }
+
   /* --- Background Updates --- */
 
   _updateBackground() {
     if (!this._hass || !this._bgContainer) return;
+
+    // If video is paused (locked), skip automatic updates
+    if (this._videoPaused) return;
 
     const entity  = this._getEntity();
     const state   = entity ? this._hass.states[entity]?.state : null;
@@ -710,7 +783,6 @@ class AnimatedBackground extends HTMLElement {
     }
     // 2. Preset: classic (video-based)
     else if (preset?.videos && state) {
-      // At night, always pick from the night videos
       const effectiveState = (night && preset.videos['clear-night']) ? 'clear-night' : state;
       const vids = preset.videos[effectiveState];
       if (vids) url = randomFrom(vids);
@@ -747,6 +819,43 @@ class AnimatedBackground extends HTMLElement {
     this._lightning(state);
 
     if (this._config.debug) console.log('Animated Background:', { state, url, gradient, particles, preset: this._config.preset });
+    this._updateCardDisplay();
+  }
+
+  _getVideoList() {
+    const entity = this._getEntity();
+    const state = entity ? this._hass?.states[entity]?.state : null;
+    const preset = this._getPreset();
+    const night = this._isNight();
+    if (state && this._config.state_url?.[state]) {
+      const v = this._config.state_url[state];
+      return Array.isArray(v) ? v : [v];
+    }
+    if (preset?.videos && state) {
+      const effectiveState = (night && preset.videos['clear-night']) ? 'clear-night' : state;
+      const vids = preset.videos[effectiveState];
+      return vids ? (Array.isArray(vids) ? vids : [vids]) : preset.defaultUrl ? [preset.defaultUrl] : [];
+    }
+    if (this._config.default_url) {
+      const v = this._config.default_url;
+      return Array.isArray(v) ? v : [v];
+    }
+    return [];
+  }
+
+  _nextVideo() {
+    const vids = this._getVideoList();
+    if (vids.length <= 1) return;
+    let url;
+    do { url = randomFrom(vids); } while (url === this._prevUrl && vids.length > 1);
+    this._prevUrl = url;
+    this._toUrl(url);
+    this._updateCardDisplay();
+  }
+
+  _togglePause() {
+    this._videoPaused = !this._videoPaused;
+    this._updateCardDisplay();
   }
 
   _toUrl(url) {
@@ -897,61 +1006,88 @@ class AnimatedBackground extends HTMLElement {
       this.shadowRoot.innerHTML = `
         <style>
           :host{display:block;min-height:1px}
-          ha-card{min-height:32px;overflow:hidden;background:transparent!important;box-shadow:none!important;border:none!important;opacity:0;transition:opacity .2s}
+          ha-card{min-height:24px;overflow:hidden;background:transparent!important;box-shadow:none!important;border:none!important;opacity:0;transition:opacity .2s}
           :host(:hover) ha-card,:host(.edit-mode) ha-card{opacity:1;background:rgba(var(--rgb-card-background-color,255,255,255),.4)!important;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
-          .h{display:flex;align-items:center;justify-content:center;padding:6px 12px;gap:6px;font-size:12px;opacity:.7}
+          .h{display:flex;align-items:center;justify-content:center;padding:4px 10px;gap:6px;font-size:11px;opacity:.7}
         </style>
         <ha-card>
-          <div class="h">Animated Background — Card hidden (hover to configure)</div>
+          <div class="h">Animated Background \u2014 hidden (hover to configure)</div>
         </ha-card>`;
       return;
     }
     this.shadowRoot.innerHTML = `
       <style>
         :host{display:block}
-        ha-card{overflow:hidden;background:rgba(var(--rgb-card-background-color,255,255,255),.6)!important;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
-        .c{display:flex;align-items:center;padding:12px 16px;gap:12px}
-        .p{width:40px;height:40px;border-radius:10px;flex-shrink:0;background-size:100% 200%;animation:g 20s ease infinite;box-shadow:0 2px 8px rgba(0,0,0,.15)}
-        @keyframes g{0%{background-position:50% 0%}50%{background-position:50% 100%}100%{background-position:50% 0%}}
-        .i{display:flex;flex-direction:column;min-width:0}
-        .t{font-size:12px;font-weight:500;opacity:.7;text-transform:uppercase;letter-spacing:.5px}
-        .s{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        ha-card{overflow:hidden;background:rgba(var(--rgb-card-background-color,255,255,255),.55)!important;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:none!important}
+        .c{display:flex;align-items:center;padding:8px 12px;gap:10px}
+        .i{display:flex;flex-direction:column;min-width:0;flex:1}
+        .t{font-size:10px;font-weight:500;opacity:.5;text-transform:uppercase;letter-spacing:.5px}
+        .s{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .ctrls{display:flex;align-items:center;gap:4px;flex-shrink:0}
+        .cb{width:28px;height:28px;border:none;border-radius:6px;background:rgba(var(--rgb-primary-color,3,169,244),.15);color:var(--primary-text-color);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;padding:0;transition:background .15s}
+        .cb:hover{background:rgba(var(--rgb-primary-color,3,169,244),.3)}
+        .cb:active{transform:scale(.9)}
+        .cb.active{background:rgba(var(--rgb-primary-color,3,169,244),.35)}
       </style>
       <ha-card>
         <div class="c">
-          <div class="p" id="pv"></div>
           <div class="i">
             <span class="t">Animated Background</span>
             <span class="s" id="sd">Initializing\u2026</span>
           </div>
+          <div class="ctrls" id="ctrls" style="display:none">
+            <button class="cb" id="btn-pause" title="Pause auto-switch">\u23F8</button>
+            <button class="cb" id="btn-next" title="Next video">\u23ED</button>
+          </div>
         </div>
       </ha-card>`;
+    this._bindCardButtons();
+  }
+
+  _bindCardButtons() {
+    const pauseBtn = this.shadowRoot?.getElementById('btn-pause');
+    const nextBtn = this.shadowRoot?.getElementById('btn-next');
+    if (pauseBtn) pauseBtn.addEventListener('click', () => this._togglePause());
+    if (nextBtn) nextBtn.addEventListener('click', () => this._nextVideo());
+  }
+
+  _isVideoPreset() {
+    const preset = this._getPreset();
+    return !!(preset?.videos) || !!(this._config.default_url) || !!(this._config.state_url && Object.values(this._config.state_url).some(v => v && v !== 'none'));
   }
 
   _updateCardDisplay() {
     if (!this._config.show_card) return;
     const sd = this.shadowRoot?.getElementById('sd');
-    const pv = this.shadowRoot?.getElementById('pv');
-    if (!sd || !pv) return;
+    if (!sd) return;
 
     const entity = this._getEntity();
     const state  = entity && this._hass ? this._hass.states[entity]?.state : null;
     const preset = this._getPreset();
 
+    // Show controls only for video-based presets with multiple videos
+    const ctrls = this.shadowRoot?.getElementById('ctrls');
+    const showControls = this._isVideoPreset() && this._getVideoList().length > 1;
+    if (ctrls) ctrls.style.display = showControls ? 'flex' : 'none';
+
+    // Update pause button state
+    const pauseBtn = this.shadowRoot?.getElementById('btn-pause');
+    if (pauseBtn) {
+      pauseBtn.textContent = this._videoPaused ? '\u25B6' : '\u23F8';
+      pauseBtn.title = this._videoPaused ? 'Resume auto-switch' : 'Pause auto-switch';
+      pauseBtn.classList.toggle('active', this._videoPaused);
+    }
+
     if (state) {
       const em = WEATHER_EMOJIS[state] || (preset?.icon || '\uD83C\uDFAC');
       const label = state.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
       const presetLabel = preset ? ` \u00B7 ${preset.label}` : '';
-      sd.textContent = `${em} ${label}${presetLabel}`;
-      const g = this._gradientFor(state);
-      if (g) { pv.style.background = g; pv.style.backgroundSize = '100% 200%'; }
-      else { pv.style.background = 'linear-gradient(135deg, #667eea, #764ba2)'; }
+      const pauseLabel = this._videoPaused ? ' \u23F8' : '';
+      sd.textContent = `${em} ${label}${presetLabel}${pauseLabel}`;
     } else if (this._config.default_url) {
       sd.textContent = '\uD83C\uDFAC Custom Background';
-      pv.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
     } else {
       sd.textContent = '\u23F8\uFE0F No entity configured';
-      pv.style.background = 'linear-gradient(135deg, #ccc, #999)';
     }
   }
 
@@ -960,7 +1096,10 @@ class AnimatedBackground extends HTMLElement {
   _cleanup() {
     this._teardownIdleWatcher();
     const sr = this._huiRoot?.shadowRoot;
-    if (sr) ['ab-container','ab-mstyles','ab-gstyles','ab-trans','ab-opac','ab-hdr','ab-idle-dim'].forEach(id => sr.getElementById(id)?.remove());
+    if (sr) {
+      ['ab-container','ab-mstyles','ab-gstyles','ab-trans','ab-opac','ab-hdr','ab-idle-dim'].forEach(id => sr.getElementById(id)?.remove());
+      this._removeHeaderTransparency(sr);
+    }
     if (this._viewObs)    { this._viewObs.disconnect(); this._viewObs = null; }
     if (this._transTimer) { clearInterval(this._transTimer); this._transTimer = null; }
     if (this._flashTimer) { clearInterval(this._flashTimer); this._flashTimer = null; }
